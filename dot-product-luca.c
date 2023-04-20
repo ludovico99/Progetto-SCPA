@@ -119,17 +119,6 @@ void parallel_dot_product_1_static(unsigned long *v1, unsigned long *v2)
 }
 
 
-
-clock_t get_time()
-{
-    clock_t time_value;
-
-   time_value = clock();
-
-    return time_value;
-}
-
-
 int main(int argc, char **argv)
 {
     unsigned long n;
