@@ -5,8 +5,9 @@
 #include <unistd.h>
 
 #define BILLION  1000000000L
-#define NUM_THREADS 10
+#define NUM_THREADS 300
 #define NUM_ITER_DELAY 120
+#define NUM_SAMPLINGS 10
 
 unsigned long DIM_SPACE_ITERATION = 100000000;
 
@@ -90,12 +91,15 @@ void parallel_dot_product_1_static(unsigned long *v1, unsigned long *v2)
     */
     #pragma omp parallel num_threads(NUM_THREADS) default(none) shared(DIM_SPACE_ITERATION, v1, v2) private(j,y) firstprivate(v3)
 #else
+    /*
+    * Supponiamo di avere un numero di iterazioni che è pari a 
+    */
     #pragma omp parallel num_threads(NUM_THREADS) default(none) shared(DIM_SPACE_ITERATION, v1, v2, v3) private(j,y)
 #endif
     {
         unsigned long partial_sum = 0;
 
-        #pragma omp for schedule(static)
+        #pragma omp for schedule(static, 10000000)
         for(i=0; i<DIM_SPACE_ITERATION; i++)
         {
             partial_sum += v1[i] * v2[i];
@@ -128,6 +132,8 @@ int main(int argc, char **argv)
     struct timespec start, stop;
     double accum;
 
+    FILE *f;
+
     if(argc > 1)
     {
         printf("Non bisogna passare alcun parametro, eseguire:\n./a.out\n");
@@ -140,28 +146,41 @@ int main(int argc, char **argv)
     /* Genero il secondo vettore */
     v2 = generate_vector();
 
-    if(clock_gettime(CLOCK_REALTIME, &start)==-1)
+    f = fopen("results4.txt", "w+");
+
+    if(f == NULL)
     {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
+        perror("Errore apertura del file: ");
+        return 1;
     }
 
-#ifdef SERIAL
-    serial_dot_product(v1, v2);
-#else
-    parallel_dot_product_1_static(v1, v2);
-#endif
-
-    if(clock_gettime(CLOCK_REALTIME, &stop)==-1)
+    for(int i = 0; i<NUM_SAMPLINGS; i++)
     {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
+        if(clock_gettime(CLOCK_REALTIME, &start)==-1)
+        {
+            perror("Errore clock()");
+            exit(EXIT_FAILURE);
+        }
+
+        #ifdef SERIAL
+            serial_dot_product(v1, v2);
+        #else
+            parallel_dot_product_1_static(v1, v2);
+        #endif
+
+        if(clock_gettime(CLOCK_REALTIME, &stop)==-1)
+        {
+            perror("Errore clock()");
+            exit(EXIT_FAILURE);
+        }
+
+        accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec)/(double)BILLION;
+
+        fprintf(f, "%lf\n", accum);
+
+        fflush(f);
+
     }
-
-    accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec)/(double)BILLION;
-    
-    printf("%lf\n", accum);
-
 
     return 0;
 
