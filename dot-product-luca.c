@@ -5,9 +5,9 @@
 #include <unistd.h>
 
 #define BILLION  1000000000L
-#define NUM_THREADS 300
+#define NUM_THREADS 1
 #define NUM_ITER_DELAY 120
-#define NUM_SAMPLINGS 10
+#define NUM_SAMPLINGS 100
 
 unsigned long DIM_SPACE_ITERATION = 100000000;
 
@@ -48,14 +48,15 @@ void serial_dot_product(unsigned long *v1, unsigned long *v2)
     for(i=0; i<DIM_SPACE_ITERATION; i++)
     {
         v3 += v1[i] * v2[i];
-
+/*
         for(j=0;j<NUM_ITER_DELAY;j++)
         {
             y = v1[i] * v2[i];
         }
+*/
     }
 
-    printf("Risultato prodotto scalare seriale %ld\n", v3);
+    //printf("Risultato prodotto scalare seriale %ld\n", v3);
 
     return;
 }
@@ -99,25 +100,26 @@ void parallel_dot_product_1_static(unsigned long *v1, unsigned long *v2)
     {
         unsigned long partial_sum = 0;
 
-        #pragma omp for schedule(static, 10000000)
+        #pragma omp for schedule(static, 1)
         for(i=0; i<DIM_SPACE_ITERATION; i++)
         {
             partial_sum += v1[i] * v2[i];
-
+/*
             for(j=0;j<NUM_ITER_DELAY;j++)
             {
                 y = v1[i] * v2[i];
             }
+*/
         }
 
-        printf("Valore di partial_sum per il thread (%d): (%ld)\n", omp_get_thread_num(), partial_sum);      
+        //printf("Valore di partial_sum per il thread (%d): (%ld)\n", omp_get_thread_num(), partial_sum);      
 
         #pragma omp critical(Aggiornamento)
         v3+=partial_sum;
 
     }
 
-    printf("Risultato prodotto scalare parallelo %ld\n", v3);
+    //printf("Risultato prodotto scalare parallelo %ld\n", v3);
 
     return;
 }
@@ -128,17 +130,20 @@ int main(int argc, char **argv)
     unsigned long n;
     unsigned long *v1;
     unsigned long *v2;
+    char *filename;
 
     struct timespec start, stop;
     double accum;
 
     FILE *f;
 
-    if(argc > 1)
+    if(argc > 2)
     {
-        printf("Non bisogna passare alcun parametro, eseguire:\n./a.out\n");
+        printf("./a.out filename-results\n");
         exit(1);
     }
+
+    filename = argv[1];
     
     /* Genero il primo vettore */
     v1 = generate_vector();
@@ -146,7 +151,7 @@ int main(int argc, char **argv)
     /* Genero il secondo vettore */
     v2 = generate_vector();
 
-    f = fopen("results4.txt", "w+");
+    f = fopen(filename, "w+");
 
     if(f == NULL)
     {
