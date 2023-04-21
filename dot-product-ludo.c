@@ -1,6 +1,10 @@
 #include <omp.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
+#include <unistd.h>
+
+#define BILLION 1000000000L
 
 unsigned long *generate_vector(unsigned long n)
 {
@@ -64,7 +68,8 @@ void parallel_dot_product_red(unsigned long *v1, unsigned long *v2, unsigned lon
     j = 0;
 
     nthreads = 10;
-#pragma omp parallel num_threads(nthreads) shared(n, v1, v2) firstprivate(y, j) reduction (+: v3) default(none)
+#pragma omp parallel num_threads(nthreads) shared(n, v1, v2) firstprivate(y, j) reduction(+ \
+                                                                                          : v3) default(none)
     {
         printf("Sono il thread %d\n", omp_get_thread_num());
 #pragma omp for schedule(dynamic)
@@ -142,7 +147,7 @@ void parallel_dot_product_guided(unsigned long *v1, unsigned long *v2, unsigned 
     {
         printf("Sono il thread %d\n", omp_get_thread_num());
 
-        #pragma omp for schedule(guided)
+#pragma omp for schedule(guided)
         for (i = 0; i < n; i++)
         {
             partial_sum += v1[i] * v2[i];
@@ -153,9 +158,9 @@ void parallel_dot_product_guided(unsigned long *v1, unsigned long *v2, unsigned 
         }
 
 #pragma omp critical
-            {
-                v3 += partial_sum;
-            }
+        {
+            v3 += partial_sum;
+        }
     }
 
     printf("Risultato prodotto scalare parallelo con guided %ld\n", v3);
@@ -168,6 +173,9 @@ int main(int argc, char **argv)
     unsigned long n;
     unsigned long *v1;
     unsigned long *v2;
+    double accum;
+
+    struct timespec start, stop;
 
     if (argc != 2)
         exit(1);
@@ -178,11 +186,79 @@ int main(int argc, char **argv)
 
     v2 = generate_vector(n);
 
-#ifndef PARALLEL
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
     serial_dot_product(v1, v2, n);
-#else
+
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    printf("SERIAL: %lf\n", accum);
+
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
     parallel_dot_product_dynamic(v1, v2, n);
-    //parallel_dot_product_guided(v1, v2, n);
-    //parallel_dot_product_red(v1, v2, n);
-#endif
+
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    printf("DYNAMIC: %lf\n", accum);
+
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    parallel_dot_product_guided(v1, v2, n);
+
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("%lf\n", accum);
+
+    parallel_dot_product_red(v1, v2, n);
+
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    printf("REDUCTION: %lf\n", accum);
+    free(v1);
+    free(v2);
+
+    return 0;
 }

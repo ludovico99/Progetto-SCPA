@@ -8,6 +8,47 @@
 
 #include "mmio.c"
 
+
+
+void coo_to_ellpack(int rows, int columns, int nz,int *I, int *J, double* val, double **values, int **col_indices) {
+    int i, j, k;
+    int max_nz_per_row = 0;
+
+    // Calcola il massimo numero di elementi non nulli in una riga
+#pragma omp parallel for schedule (dynamic) shared (I, J, val) num_threads (10) default(none)
+    for (i = 0; i < rows; i++) {
+        int nz_in_row = 0;
+        for (j = 0; j < nz; j++) {
+            if (I[j] == i) {
+                nz_in_row++;
+            }
+        }
+        if (nz_in_row > max_nz_per_row) {
+            max_nz_per_row = nz_in_row;
+        }
+    }
+
+    // Alloca memoria per gli array ELLPACK
+    *values = (double*)malloc(columns* max_nz_per_row * sizeof(double));
+    *col_indices = (int*)malloc(columns * max_nz_per_row * sizeof(int));
+
+    // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
+    for (i = 0; i < n; i++) {
+        int offset = 0;
+        for (j = 0; j < nz; j++) {
+            if (entries[j].row == i) {
+                (*values)[i * max_nz_per_row + offset] = entries[j].val;
+                (*col_indices)[i * max_nz_per_row + offset] = entries[j].col;
+                offset++;
+            }
+        }
+        for (k = offset; k < max_nz_per_row; k++) {
+            (*values)[i * max_nz_per_row + k] = 0.0;
+            (*col_indices)[i * max_nz_per_row + k] = 0;
+        }
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int ret_code;
@@ -17,6 +58,9 @@ int main(int argc, char *argv[])
     int M, N, nz;
     int *I, *J;
     double *val;
+
+    double * values = NULL;
+    int * col_indices = NULL;
 
     if (argc < 2)
     {
@@ -56,6 +100,10 @@ int main(int argc, char *argv[])
             J[i]--;
             printf("%d %d %lg\n", I[i], J[i], val[i]);
         }
+
+    coo_to_ellpack(M,N,nz,I,J,val, &values, &col_indices);
+
+
     }
     else
     {
@@ -66,6 +114,8 @@ int main(int argc, char *argv[])
 
     if (f != stdin)
         fclose(f);
+
+   
 
     // /************************/
     // /* now write out matrix */
