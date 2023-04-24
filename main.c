@@ -1,4 +1,4 @@
-#include "omp.h"
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,44 +8,156 @@
 
 #include "mmio.c"
 
-
-
-void coo_to_ellpack(int rows, int columns, int nz,int *I, int *J, double* val, double **values, int **col_indices) {
+void coo_to_ellpack(int rows, int columns, int nz, int *I, int *J, double *val, double **values, int **col_indices)
+{
     int i, j, k;
     int max_nz_per_row = 0;
+    int max_so_far = 0;
 
-    // Calcola il massimo numero di elementi non nulli in una riga
-#pragma omp parallel for schedule (dynamic) shared (I, J, val) num_threads (10) default(none)
-    for (i = 0; i < rows; i++) {
-        int nz_in_row = 0;
-        for (j = 0; j < nz; j++) {
-            if (I[j] == i) {
-                nz_in_row++;
+// Calcola il massimo numero di elementi non nulli in una riga
+#pragma omp parallel shared(I, J, val, max_so_far, rows, nz) firstprivate(max_nz_per_row) num_threads(10) default(none)
+    {
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < rows; i++)
+        {
+            int nz_in_row = 0;
+            for (int j = 0; j < nz; j++)
+            {
+                if (I[j] == i)
+                    nz_in_row++;
             }
+            if (nz_in_row > max_nz_per_row)
+                max_nz_per_row = nz_in_row;
         }
-        if (nz_in_row > max_nz_per_row) {
-            max_nz_per_row = nz_in_row;
+#pragma omp critical
+        if (max_nz_per_row > max_so_far)
+            max_so_far = max_nz_per_row;
+    }
+    //printf("MAX_NZ_PER_ROW is %d\n", max_so_far);
+
+    // Alloca memoria per gli array ELLPACK
+    values = (double **)malloc(rows * sizeof(double *));
+    if (values == NULL)
+    {
+        printf("Errore malloc\n");
+        exit(1);
+    }
+
+#pragma omp parallel for schedule(dynamic) shared(rows, values, max_so_far) num_threads(10) default(none)
+    for (int k = 0; k < rows; k++)
+    {
+        values[k] = (double *)malloc(max_so_far * sizeof(double));
+        if (values[k] == NULL)
+        {
+            printf("Errore malloc\n");
+            exit(1);
         }
     }
 
-    // Alloca memoria per gli array ELLPACK
-    *values = (double*)malloc(columns* max_nz_per_row * sizeof(double));
-    *col_indices = (int*)malloc(columns * max_nz_per_row * sizeof(int));
+    col_indices = (int **)malloc(rows * sizeof(int *));
+    if (col_indices == NULL)
+    {
+        printf("Errore malloc\n");
+        exit(1);
+    }
+#pragma omp parallel for schedule(dynamic) shared(rows, col_indices, max_so_far) num_threads(10) default(none)
+    for (k = 0; k < rows; k++)
+    {
+        col_indices[k] = (int *)malloc(max_so_far * sizeof(int));
+        if (col_indices[k] == NULL)
+        {
+            printf("Errore malloc\n");
+            exit(1);
+        }
+    }
 
     // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
-    for (i = 0; i < n; i++) {
+    // #pragma omp parallel for schedule(dynamic) shared(rows, values,col_indices max_so_far) num_threads(10) default(none)
+    for (int i = 0; i < rows; i++)
+    {
         int offset = 0;
-        for (j = 0; j < nz; j++) {
-            if (entries[j].row == i) {
-                (*values)[i * max_nz_per_row + offset] = entries[j].val;
-                (*col_indices)[i * max_nz_per_row + offset] = entries[j].col;
+        for (int j = 0; j < nz; j++)
+        {
+            if (I[j] == i)
+            {
+                values[i][offset] = val[j];
+                col_indices[i][offset] = J[j];
                 offset++;
             }
         }
-        for (k = offset; k < max_nz_per_row; k++) {
-            (*values)[i * max_nz_per_row + k] = 0.0;
-            (*col_indices)[i * max_nz_per_row + k] = 0;
+        for (k = offset; k < max_so_far; k++)
+        {
+            values[i][k] = 0.0;
+            col_indices[i][k] = 0;
         }
+    }
+
+    // for (j = 0; j < max_so_far; j++)
+    // {
+    //     printf("ELLPACK VALUE: %.66lf - COL: %d\n", values[1812][j], col_indices[1812][j]);
+    // }
+}
+
+void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, double *as, int *ja, int **irp)
+{
+    int i, j, k;
+    int max_nz_per_row = 0;
+    int max_so_far = 0;
+    int *end = NULL;
+    int *curr = NULL;
+    int offset = 0;
+    // Alloca memoria per gli array CSR
+    as = (double *)malloc(nz * sizeof(double));
+    if (as == NULL)
+    {
+        printf("Errore malloc per as\n");
+        exit(1);
+    }
+
+    ja = (int *)malloc(nz * sizeof(int));
+    if (ja == NULL)
+    {
+        printf("Errore malloc per ja\n");
+        exit(1);
+    }
+
+    irp = (int **)malloc(rows * sizeof(int *));
+    if (irp == NULL)
+    {
+        printf("Errore malloc per ja\n");
+        exit(1);
+    }
+
+    // Riempie gli array CSR
+    offset = 0;
+    for (int i = 0; i < rows; i++)
+    {
+        irp[i] = &ja[offset];
+        for (int j = 0; j < nz; j++)
+        {
+            if (I[j] == i)
+            {
+                as[offset] = val[j];
+                ja[offset] = J[j];
+                offset++;
+            }
+        }
+    }
+
+    end = irp[1812];
+    curr = ja;
+    offset = 0;
+    while (curr != end)
+    {
+        offset++;
+        curr++;
+    }
+
+    while (curr != (int*)(&irp[1812] + 1))
+    {
+        printf("VALUE: %.66lf - COL: %d\n", as[offset], *curr);
+        curr++;
+        offset ++;
     }
 }
 
@@ -59,8 +171,12 @@ int main(int argc, char *argv[])
     int *I, *J;
     double *val;
 
-    double * values = NULL;
-    int * col_indices = NULL;
+    double **values = NULL;
+    int **col_indices = NULL;
+
+    double *as = NULL;
+    int *ja = NULL;
+    int **irp = NULL;
 
     if (argc < 2)
     {
@@ -87,23 +203,22 @@ int main(int argc, char *argv[])
 
         if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
             exit(1);
-
+        printf("TOTAL_NOT_ZERO: %d\n", nz);
         I = (int *)malloc(nz * sizeof(int));
         J = (int *)malloc(nz * sizeof(int));
         val = (double *)malloc(nz * sizeof(double));
-    nthreads = nz / 16;
-    #pragma omp parallel for schedule (static, 16) num_threads(nthreads) default(none)
+        nthreads = nz / 16;
+#pragma omp parallel for schedule(static, 16) shared(nz, I, J, val, f) num_threads(nthreads) default(none)
         for (int i = 0; i < nz; i++)
         {
             fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
             I[i]--; /* adjust from 1-based to 0-based */
             J[i]--;
-            printf("%d %d %lg\n", I[i], J[i], val[i]);
+            // printf("%d %d %lg\n", I[i], J[i], val[i]);
         }
 
-    coo_to_ellpack(M,N,nz,I,J,val, &values, &col_indices);
-
-
+        //coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
+        coo_to_CSR(M, N, nz, I, J, val, as, ja, irp);
     }
     else
     {
@@ -114,8 +229,6 @@ int main(int argc, char *argv[])
 
     if (f != stdin)
         fclose(f);
-
-   
 
     // /************************/
     // /* now write out matrix */
