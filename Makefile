@@ -1,6 +1,9 @@
 all:
 	gcc -fopenmp main.c
 
+matrice_prova:
+	./a.out Matrici/prova.mtx 
+
 dot-product-compile-seriale:
 	gcc -fopenmp dot-product-ludo.c
 
