@@ -98,7 +98,7 @@ void coo_to_ellpack(int rows, int columns, int nz, int *I, int *J, double *val, 
     // }
 }
 
-void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, double *as, int *ja, int **irp)
+void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
 {
     int i, j, k;
     int max_nz_per_row = 0;
@@ -109,55 +109,67 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
 
     printf("Starting CSR conversion ...\n");
     // Alloca memoria per gli array CSR
-    as = (double *)malloc(nz * sizeof(double));
-    if (as == NULL)
+    *as = (double *)malloc(nz * sizeof(double));
+    if (*as == NULL)
     {
         printf("Errore malloc per as\n");
         exit(1);
     }
 
-    ja = (int *)malloc(nz * sizeof(int));
-    if (ja == NULL)
+    *ja = (int *)malloc(nz * sizeof(int));
+    if (*ja == NULL)
     {
         printf("Errore malloc per ja\n");
         exit(1);
     }
 
-    memset(ja, 0, sizeof(int)*nz);
-
-    irp = (int **)malloc(rows * sizeof(int *));
-    if (irp == NULL)
+    *irp = (int *)malloc(rows * sizeof(int));
+    if (*irp == NULL)
     {
         printf("Errore malloc per ja\n");
         exit(1);
     }
 
+    printf("Before memset ...\n");
+    memset(*irp, -1, sizeof(int) * rows);
+    printf("After memset ... \n");
     // Riempie gli array CSR
     offset = 0;
+    int not_empty = 0;
     for (int i = 0; i < rows; i++)
-    {
-        irp[i] = &ja[offset];
+    {   
+        printf("OFFSET %d\n", offset);
+        (*irp)[i] = offset;
+        not_empty = 0;
         for (int j = 0; j < nz; j++)
         {
             if (I[j] == i)
             {
-                as[offset] = val[j];
-                ja[offset] = J[j];
+                (*as)[offset] = val[j];
+                (*ja)[offset] = J[j];
                 offset++;
+                not_empty = 1;
             }
         }
+        if (!not_empty) (*irp)[i] = -1;
+    }
+
+    if (offset != nz) {
+        printf("Error during CSR conversion has occured\n");
+        exit(0);
     }
 
     printf("Completed CSR conversion ...\n");
 
-    for (int i = 0; i <rows; i++){
-        printf ("IRP VALUES: %d\n", *irp[i]);
-    }
+    // for (int i = 0; i < rows; i++)
+    // {
+    //     printf("IRP VALUES: %d\n", (*irp)[i]);
+    // }
 
-    for (int i = 0; i <nz; i++){
-        printf ("JA VALUES: %d - VALUE: %lf\n", ja[i], as[i]);
-
-    }
+    // for (int i = 0; i < nz; i++)
+    // {
+    //     printf("JA VALUES: %d - VALUE: %lf\n", (*ja)[i], (*as)[i]);
+    // }
 
     // end = irp[1812];
     // curr = ja;
@@ -176,14 +188,14 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
     // }
 }
 
-double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int **irp_A, double **X)
+double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X)
 {
 
     double **y = NULL;
     int *curr;
-    int offset = 0, row = 0;
-    int *start_row = NULL;
-    int *end_row = NULL;
+    int offset = 0;
+    int start_row = 0;
+    int end_row = 0;
 
     printf("Computing serial product ...\n");
     y = (double **)malloc(M * sizeof(double *));
@@ -194,7 +206,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     }
 
     for (int i = 0; i < M; i++)
-    {   
+    {
         y[i] = (double *)malloc(K * sizeof(double));
         if (y[i] == NULL)
         {
@@ -209,197 +221,209 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
     for (int i = 0; i < M; i++)
-    {
-        printf("iteration %d\n", i);
-        start_row = irp_A[i];
-        printf("sono qui!!");
+    {   
         if (i < (M - 1))
         {
-            end_row = irp_A[i + 1];
-
+            //int offset_row = offset;
             for (int z = 0; z < K; z++)
             {
-                while (start_row != end_row)
-                {   
-                    printf("Computing y[%d][%d]\n", i, z);
-                    y[i][z] += as_A[offset] * X[*start_row][z];
-                    start_row++;
-                    offset++;
+                printf("Computing y[%d][%d]\n", i, z);
+                //offset = offset_row;
+                printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
+                if (irp_A[i] == -1){
+                    printf("Row %d is the vector zero\n", i);
+                    break;
                 }
+
+                for (int j = irp_A[i]; j < irp_A[i + 1]; j++){
+                    
+                    y[i][z] += as_A[j] * X[ja_A[j]][z];
+                    //start_row++;
+                    //offset++;
+                }
+
             }
+           
         }
         else
         {
+            int offset_end = irp_A[i];
             for (int z = 0; z < K; z++)
-            {
+            {   
+                printf("Computing y[%d][%d]\n", i, z);
+                offset = offset_end;
+                printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
                 while (offset < nz)
                 {
-                    printf("Computing y[%d][%d]\n", i, z);
                     y[i][z] += as_A[offset] * X[ja_A[offset]][z];
-                    start_row++;
                     offset++;
                 }
             }
         }
     }
     printf("Completed serial product ...\n");
+
+    for (int i = 0; i < M; i++)
+    {
+        for (int z = 0; z < K; z++)
+        {
+            printf("Value y[%d][%d] = %f\n", i, z, y[i][z]);
+        }
+    }
 }
 
-    double **serial_product(int M, int N, int K, double **A, double **X)
-    {
-        double **y = NULL;
+double **serial_product(int M, int N, int K, double **A, double **X)
+{
+    double **y = NULL;
 
-        y = (double **)malloc(M * sizeof(double *));
-        if (y == NULL)
+    y = (double **)malloc(M * sizeof(double *));
+    if (y == NULL)
+    {
+        printf("Errore malloc per y\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < M; i++)
+    {
+        y[i] = (double *)malloc(K * sizeof(double));
+        if (y[i] == NULL)
         {
-            printf("Errore malloc per y\n");
+            printf("Errore malloc\n");
             exit(1);
         }
-
-        for (int i = 0; i < M; i++)
+        for (int z = 0; z < K; z++)
         {
-            y[i] = (double *)malloc(K * sizeof(double));
-            if (y[i] == NULL)
-            {
-                printf("Errore malloc\n");
-                exit(1);
-            }
-            for (int z = 0; z < K; z++)
-            {
-                y[i][z] = 0.0;
-            }
-        }
-
-        // calcola il prodotto matrice - multi-vettore
-        for (int i = 0; i < M; i++)
-        {
-            for (int z = 0; z < K; z++)
-            {
-                for (int j = 0; j < N; j++)
-                {
-                    y[i][z] += A[i][j] * X[j][z];
-                }
-            }
+            y[i][z] = 0.0;
         }
     }
 
-
-    void create_dense_matrix(int N, int K, double **x)
+    // calcola il prodotto matrice - multi-vettore
+    for (int i = 0; i < M; i++)
     {
-            
-        printf("Creating dense matrix ...\n");
-        x = (double **)malloc(N * sizeof(double *));
-        if (x == NULL)
+        for (int z = 0; z < K; z++)
         {
-            printf("Errore malloc per x\n");
-            exit(1);
-        }
-
-        for (int j = 0; j < N; j++)
-        {
-            x[j] = (double *)malloc(K * sizeof(double));
-            if (x[j] == NULL)
+            for (int j = 0; j < N; j++)
             {
-                printf("Errore malloc per x[i]\n");
-                exit(1);
-            }
-             for (int z = 0; z < K; z++)
-            {
-                x[j][z] = 1.0;
+                y[i][z] += A[i][j] * X[j][z];
             }
         }
+    }
+}
 
-        printf("Completed dense matrix creation...\n");
+void create_dense_matrix(int N, int K, double ***x)
+{
 
-
+    printf("Creating dense matrix ...\n");
+    *x = (double **)malloc(N * sizeof(double *));
+    if (*x == NULL)
+    {
+        printf("Errore malloc per x\n");
+        exit(1);
     }
 
-    int main(int argc, char *argv[])
+    for (int j = 0; j < N; j++)
     {
-        int ret_code;
-        MM_typecode matcode;
-        FILE *f;
-        int nthreads;
-        int M, N, nz;
-        int *I, *J;
-        double *val;
-        double **y;
-
-        double **values = NULL;
-        int **col_indices = NULL;
-
-        double *as_A = NULL;
-        int *ja_A = NULL;
-        int **irp_A = NULL;
-
-        double **x = NULL;
-
-        int K = 2; // It could be dynamic...
-
-        if (argc < 2)
+        (*x)[j] = (double *)malloc(K * sizeof(double));
+        if ((*x)[j] == NULL)
         {
-            fprintf(stderr, "Usage: %s [matrix-market-filename]\n", argv[0]);
+            printf("Errore malloc per x[j]\n");
             exit(1);
         }
-        else
+        for (int z = 0; z < K; z++)
         {
-            if ((f = fopen(argv[1], "r")) == NULL)
-                exit(1);
+            (*x)[j][z] = 1.0;
         }
+    }
 
-        if (mm_read_banner(f, &matcode) != 0)
-        {
-            printf("Could not process Matrix Market banner.\n");
+    printf("Completed dense matrix creation...\n");
+}
+
+int main(int argc, char *argv[])
+{
+    int ret_code;
+    MM_typecode matcode;
+    FILE *f;
+    int nthreads;
+    int M, N, nz;
+    int *I, *J;
+    double *val;
+    double **y;
+
+    double **values = NULL;
+    int **col_indices = NULL;
+
+    double *as_A = NULL;
+    int *ja_A = NULL;
+    int *irp_A = NULL;
+
+    double **X = NULL;
+
+    int K = 2; // It could be dynamic...
+
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: %s [matrix-market-filename]\n", argv[0]);
+        exit(1);
+    }
+    else
+    {
+        if ((f = fopen(argv[1], "r")) == NULL)
             exit(1);
-        }
+    }
 
-        /*  This is how one can screen matrix types if their application */
-        /*  only supports a subset of the Matrix Market data types.      */
-        if (mm_is_sparse(matcode))
-        {
-            /* find out size of sparse matrix .... */
+    if (mm_read_banner(f, &matcode) != 0)
+    {
+        printf("Could not process Matrix Market banner.\n");
+        exit(1);
+    }
 
-            if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
-                exit(1);
-            printf("TOTAL_NOT_ZERO: %d\n", nz);
-            I = (int *)malloc(nz * sizeof(int));
-            J = (int *)malloc(nz * sizeof(int));
-            val = (double *)malloc(nz * sizeof(double));
-            nthreads = nz / 16;
+    /*  This is how one can screen matrix types if their application */
+    /*  only supports a subset of the Matrix Market data types.      */
+    if (mm_is_sparse(matcode))
+    {
+        /* find out size of sparse matrix .... */
+
+        if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
+            exit(1);
+        printf("TOTAL_NOT_ZERO: %d\n", nz);
+        I = (int *)malloc(nz * sizeof(int));
+        J = (int *)malloc(nz * sizeof(int));
+        val = (double *)malloc(nz * sizeof(double));
+        nthreads = nz / 16;
 #pragma omp parallel for schedule(static, 16) shared(nz, I, J, val, f) num_threads(nthreads) default(none)
-            for (int i = 0; i < nz; i++)
-            {
-                fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
-                I[i]--; /* adjust from 1-based to 0-based */
-                J[i]--;
-                // printf("%d %d %lg\n", I[i], J[i], val[i]);
-            }
-
-            // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
-            coo_to_CSR(M, N, nz, I, J, val, as_A, ja_A, irp_A);
-            // Creating a dense matrix ...
-            create_dense_matrix(N, K, x);
-
-            y = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, x);
-        }
-        else
+        for (int i = 0; i < nz; i++)
         {
-            printf("Sorry, this application does not support ");
-            printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
-            exit(1);
+            fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+            I[i]--; /* adjust from 1-based to 0-based */
+            J[i]--;
+            // printf("%d %d %lg\n", I[i], J[i], val[i]);
         }
 
-        if (f != stdin)
-            fclose(f);
+        // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
+        coo_to_CSR(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+        // Creating a dense matrix ...
+        create_dense_matrix(N, K, &X);
 
-        // /************************/
-        // /* now write out matrix */
-        // /************************/
-
-        // mm_write_banner(stdout, matcode);
-        // mm_write_mtx_crd_size(stdout, M, N, nz);
-        // for (i = 0; i < nz; i++)
-        //     fprintf(stdout, "%d %d %20.19g\n", I[i] + 1, J[i] + 1, val[i]);
-
-        return 0;
+        y = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
     }
+    else
+    {
+        printf("Sorry, this application does not support ");
+        printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
+        exit(1);
+    }
+
+    if (f != stdin)
+        fclose(f);
+
+    // /************************/
+    // /* now write out matrix */
+    // /************************/
+
+    // mm_write_banner(stdout, matcode);
+    // mm_write_mtx_crd_size(stdout, M, N, nz);
+    // for (i = 0; i < nz; i++)
+    //     fprintf(stdout, "%d %d %20.19g\n", I[i] + 1, J[i] + 1, val[i]);
+
+    return 0;
+}

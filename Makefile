@@ -20,4 +20,4 @@ max_nz_by_row:
 	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1813 " | wc -l
 
 print_elem_by_row:
-	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1813 "
+	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^331 "
