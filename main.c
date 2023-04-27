@@ -144,22 +144,99 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
         }
     }
 
-    end = irp[1812];
-    curr = ja;
-    offset = 0;
-    while (curr != end)
+    // end = irp[1812];
+    // curr = ja;
+    // offset = 0;
+    // while (curr != end)
+    // {
+    //     offset++;
+    //     curr++;
+    // }
+
+    // while (curr != (int*)(&irp[1812] + 1))
+    // {
+    //     printf("VALUE: %.66lf - COL: %d\n", as[offset], *curr);
+    //     curr++;
+    //     offset ++;
+    // }
+}
+
+double ** serial_product_CSR (int rows, int cols, double *as_A, int *ja_A, int **irp_A, double ** x){
+
+    double ** y = NULL;
+    int * curr;
+    int offset = 0, row = 0;
+    
+    y = (double **) malloc(rows * sizeof(double*));
+    if (y == NULL)
     {
-        offset++;
-        curr++;
+        printf("Errore malloc per y\n");
+        exit(1);
     }
 
-    while (curr != (int*)(&irp[1812] + 1))
+     for (int j = 0; j < rows; j++)
     {
-        printf("VALUE: %.66lf - COL: %d\n", as[offset], *curr);
-        curr++;
-        offset ++;
+        x[j] = (double *)malloc(cols * sizeof(double));
+        if (x[j]  == NULL)
+        {
+            printf("Errore malloc\n");
+            exit(1);
+        }
     }
+
+    // calcola il prodotto matrice - multi-vettore 
+    for (int k = 0; k < rows; k++){
+        curr = irp_A[k];
+        while (curr != irp_A[k + 1])
+        {
+            y[k][ja_A[offset]] += as_A[offset] * x[ja_A[offset]][k];
+            curr++;
+            offset ++;
+        }
+
+    }
+
+
+    
 }
+
+void create_dense_matrix_CSR (int rows, int cols, double **x){
+    int nz = rows * cols;
+    int offset = 0;
+    // Alloca memoria per gli array CSR
+    x = (double **) malloc(rows * sizeof(double*));
+    if (x == NULL)
+    {
+        printf("Errore malloc per x\n");
+        exit(1);
+    }
+
+     for (int j = 0; j < rows; j++)
+    {
+        x[j] = (double *)malloc(cols * sizeof(double));
+        if (x[j]  == NULL)
+        {
+            printf("Errore malloc per x[j]\n");
+            exit(1);
+        }
+    }
+
+     for (int i = 0; i < rows; i++)
+    {   
+        x[i] = (double *)malloc(cols * sizeof(double));
+        if (x[i]  == NULL)
+        {
+            printf("Errore malloc\n");
+            exit(1);
+        }
+        for (int j = 0; j < cols; j++){
+            x[i][j] = 1.0;
+        }
+        
+    }
+
+
+} 
 
 int main(int argc, char *argv[])
 {
@@ -169,14 +246,19 @@ int main(int argc, char *argv[])
     int nthreads;
     int M, N, nz;
     int *I, *J;
+    int k = 3; // It could be dynamic...
     double *val;
+    double ** y;
 
     double **values = NULL;
     int **col_indices = NULL;
 
-    double *as = NULL;
-    int *ja = NULL;
-    int **irp = NULL;
+    double *as_A = NULL;
+    int *ja_A = NULL;
+    int **irp_A = NULL;
+
+    double ** x = NULL;
+
 
     if (argc < 2)
     {
@@ -218,8 +300,14 @@ int main(int argc, char *argv[])
         }
 
         //coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
-        coo_to_CSR(M, N, nz, I, J, val, as, ja, irp);
-    }
+        coo_to_CSR(M, N, nz, I, J, val, as_A, ja_A, irp_A);
+        //Creating a dense matrix ...
+        create_dense_matrix_CSR (N, k, x);
+
+        y = serial_product_CSR(M, k, as_A, ja_A, irp_A, x);
+
+
+    }   
     else
     {
         printf("Sorry, this application does not support ");
