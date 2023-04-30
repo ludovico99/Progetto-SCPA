@@ -101,7 +101,7 @@ void coo_to_ellpack(int rows, int columns, int nz, int *I, int *J, double *val, 
     // }
 }
 
-void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
+void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
 {
     int i, j, k;
     int max_nz_per_row = 0;
@@ -160,36 +160,123 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
     if (offset != nz)
     {
         printf("Error during CSR conversion has occured\n");
+        printf("%d-%d", offset, nz);
         exit(0);
     }
 
     printf("Completed CSR conversion ...\n");
+}
 
-    // for (int i = 0; i < rows; i++)
-    // {
-    //     printf("IRP VALUES: %d\n", (*irp)[i]);
-    // }
+void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
+{
+    int i, j, k;
+    int max_nz_per_row = 0;
+    int max_so_far = 0;
+    int *end = NULL;
+    int *curr = NULL;
+    int offset = 0;
 
-    // for (int i = 0; i < nz; i++)
-    // {
-    //     printf("JA VALUES: %d - VALUE: %lf\n", (*ja)[i], (*as)[i]);
-    // }
+    int occ[M];
+    int sum_occ[M];
 
-    // end = irp[1812];
-    // curr = ja;
-    // offset = 0;
-    // while (curr != end)
-    // {
-    //     offset++;
-    //     curr++;
-    // }
+    memset(occ, 0, sizeof(int) * M);
+    memset(sum_occ, 0, sizeof(int) * M);
 
-    // while (curr != (int*)(&irp[1812] + 1))
-    // {
-    //     printf("VALUE: %.66lf - COL: %d\n", as[offset], *curr);
-    //     curr++;
-    //     offset ++;
-    // }
+    printf("Starting parallel CSR conversion ...\n");
+    // Alloca memoria per gli array CSR
+    *as = (double *)malloc(nz * sizeof(double));
+    if (*as == NULL)
+    {
+        printf("Errore malloc per as\n");
+        exit(1);
+    }
+
+    *ja = (int *)malloc(nz * sizeof(int));
+    if (*ja == NULL)
+    {
+        printf("Errore malloc per ja\n");
+        exit(1);
+    }
+
+    *irp = (int *)malloc(M * sizeof(int));
+    if (*irp == NULL)
+    {
+        printf("Errore malloc per ja\n");
+        exit(1);
+    }
+
+    printf("Before memset ...\n");
+    memset(*irp, -1, sizeof(int) * M);
+    printf("After memset ... \n");
+
+    for (int i = 0; i < nz; i++)
+    {
+        occ[I[i]]++;
+        // printf("%d\n", occ[I[i]]);
+    }
+    int sum = 0;
+    for (int i = 0; i < M; i++)
+    {
+        sum += occ[i];
+    }
+
+    for (int i = 0; i < M; i++)
+    {
+        if (i == 0)
+            sum_occ[i] = occ[0];
+        else
+            sum_occ[i] = sum_occ[i - 1] + occ[i];
+    }
+
+    printf("Filling CSR data structure ... \n");
+    // Riempie gli array CSR
+    offset = 0;
+    int nthread = omp_get_num_procs();
+    int chunk_size = 0;
+
+    if (M % nthread == 0)
+    {
+        chunk_size = M / nthread;
+    }
+    else
+        chunk_size = M / nthread + 1;
+
+    int not_empty = 0;
+    int num_first_nz_current_row;
+    int my_offset;
+
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, M, nz, ja, as, irp, val, I, J, sum_occ) private(my_offset, not_empty, num_first_nz_current_row) default(none)
+
+    for (int i = 0; i < M; i++)
+    {
+        not_empty = 0;
+        num_first_nz_current_row;
+
+        if (i == 0)
+        {
+            num_first_nz_current_row = 0;
+        }
+        else
+            num_first_nz_current_row = sum_occ[i - 1];
+
+        (*irp)[i] = num_first_nz_current_row;
+        my_offset = num_first_nz_current_row;
+
+        for (int j = 0; j < nz; j++)
+        {
+            if (I[j] == i)
+            {
+                (*as)[my_offset] = val[j];
+                (*ja)[my_offset] = J[j];
+                my_offset++;
+                not_empty = 1;
+            }
+        }
+        if (!not_empty)
+            (*irp)[i] = -1;
+    }
+
+    printf("Completed parallel CSR conversion ...\n");
 }
 
 double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X)
@@ -315,7 +402,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     }
 
     int chunck_size = M / 8;
-#pragma omp parallel for collapse (2) schedule(static, chunck_size) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, nthread, chunck_size) default(none)
+#pragma omp parallel for collapse(2) schedule(static, chunck_size) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, nthread, chunck_size) default(none)
     for (int i = 0; i < M; i++)
     {
         // #pragma omp parallel for schedule(static, K/8) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, i) default(none)
@@ -434,6 +521,25 @@ void create_dense_matrix(int N, int K, double ***x)
     printf("Completed dense matrix creation...\n");
 }
 
+FILE *init_stream(const char *filename)
+{
+    MM_typecode matcode;
+    FILE *f;
+    int M, N, nz;
+    if ((f = fopen(filename, "r")) == NULL)
+        exit(1);
+
+    if (mm_read_banner(f, &matcode) != 0)
+    {
+        printf("Could not process Matrix Market banner.\n");
+        exit(1);
+    }
+    if (mm_read_mtx_crd_size(f, &M, &N, &nz) != 0)
+        exit(1);
+
+    return f;
+}
+
 int main(int argc, char *argv[])
 {
     int ret_code;
@@ -455,7 +561,7 @@ int main(int argc, char *argv[])
 
     double **X = NULL;
 
-    int K = 64; // It could be dynamic...
+    int K = 8; // It could be dynamic...
 
     if (argc < 2)
     {
@@ -476,66 +582,153 @@ int main(int argc, char *argv[])
 
     /*  This is how one can screen matrix types if their application */
     /*  only supports a subset of the Matrix Market data types.      */
-    if (mm_is_sparse(matcode))
+    if (!mm_is_matrix(matcode))
     {
-        /* find out size of sparse matrix .... */
-
-        if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
-            exit(1);
-        printf("TOTAL_NOT_ZERO: %d\n", nz);
-        I = (int *)malloc(nz * sizeof(int));
-        J = (int *)malloc(nz * sizeof(int));
-        val = (double *)malloc(nz * sizeof(double));
-#pragma omp parallel for schedule(static, 1) shared(nz, I, J, val, f) num_threads(nthread) default(none)
-        for (int i = 0; i < nz; i++)
+        printf("Sorry, this application does not support ");
+        printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
+        exit(1);
+    }
+    else if (!mm_is_sparse(matcode))
+    {
+        printf("Sorry, this application does not support ");
+        printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
+        exit(1);
+    }
+    else if (mm_is_symmetric(matcode))
+    {
+        if (mm_is_pattern(matcode))
         {
-            fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
-            I[i]--; /* adjust from 1-based to 0-based */
-            J[i]--;
-            // printf("%d %d %lg\n", I[i], J[i], val[i]);
+            printf("TODO pattern matrix conversion");
+            return 0;
         }
-
-        // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
-        coo_to_CSR(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-
-        // Creating a dense matrix ...
-        create_dense_matrix(N, K, &X);
-
-        y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
-
-        y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
-
-        for (int i = 0; i < M; i++)
+        else if (mm_is_real(matcode))
         {
-            for (int z = 0; z < K; z++)
+            /* find out size of sparse matrix .... */
+            if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
+                exit(1);
+
+            printf("Initial NZ for a symmetric matrix: %d\n", nz);
+            int computed_nz = nz * 2;
+            int i; // Raw index for the current nz
+            int j; // Column index for the current nz
+            double value;
+            // Computing real value for nz;
+            for (int i = 0; i < nz; i++)
             {
-                if (y_serial[i][z] != y_parallel[i][z])
+                fscanf(f, "%d %d %lg\n", &i, &j, &value);
+                if (i == j)
+                    computed_nz--;
+            }
+            f = init_stream(argv[1]);
+            I = (int *)malloc(computed_nz * sizeof(int));
+            J = (int *)malloc(computed_nz * sizeof(int));
+            val = (double *)malloc(computed_nz * sizeof(double));
+
+#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz) num_threads(nthread) default(none)
+            for (int i = 0; i < nz; i++)
+            {
+                fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+                I[i]--; /* adjust from 1-based to 0-based */
+                J[i]--;
+
+                if (I[i] != J[i])
                 {
-                    printf("Serial result is different ...");
-                    exit(0);
+                    if (nz + i < computed_nz)
+                    {
+
+                        I[nz + i] = J[i];
+                        J[nz + i] = I[i];
+                    }
                 }
             }
+
+            nz = computed_nz;
+            printf("TOTAL NZ for a symmetric matrix: %d\n", nz);
         }
-        printf("Same results...\n");
+        else
+        {
+            printf("Sorry, this application does not support ");
+            printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
+            exit(1);
+        }
     }
+    else if (mm_is_general(matcode))
+    {
+        if (mm_is_pattern(matcode))
+        {
+            if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
+                exit(1);
+            printf("PATTERN-GENERAL MATRIX\n");
+            printf("total not zero: %d\n", nz);
+            I = (int *)malloc(nz * sizeof(int));
+            J = (int *)malloc(nz * sizeof(int));
+            val = NULL;
+#pragma omp parallel for schedule(static, 1) shared(nz, I, J, f) num_threads(nthread) default(none)
+            for (int i = 0; i < nz; i++)
+            {
+                fscanf(f, "%d %d\n", &I[i], &J[i]);
+                I[i]--; /* adjust from 1-based to 0-based */
+                J[i]--;
+            }
+        }
+
+        else if (mm_is_real(matcode))
+        {
+            /* find out size of sparse matrix .... */
+            if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
+                exit(1);
+            printf("REAL-GENERAL MATRIX\n");
+            printf("total not zero: %d\n", nz);
+            I = (int *)malloc(nz * sizeof(int));
+            J = (int *)malloc(nz * sizeof(int));
+            val = (double *)malloc(nz * sizeof(double));
+#pragma omp parallel for schedule(static, 1) shared(nz, I, J, val, f) num_threads(nthread) default(none)
+            for (int i = 0; i < nz; i++)
+            {
+                fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+                I[i]--; /* adjust from 1-based to 0-based */
+                J[i]--;
+                // printf("%d %d %lg\n", I[i], J[i], val[i]);
+            }
+        }
+        else
+        {
+            printf("Sorry, this application does not support ");
+            printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
+            exit(1);
+        }
+    }
+
     else
     {
         printf("Sorry, this application does not support ");
         printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
         exit(1);
     }
+    // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
+     coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    // Creating a dense matrix ...
+    create_dense_matrix(N, K, &X);
+
+    y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
+
+    y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
+
+    for (int i = 0; i < M; i++)
+    {
+        for (int z = 0; z < K; z++)
+        {
+            if (y_serial[i][z] != y_parallel[i][z])
+            {
+                printf("Serial result is different ...");
+                exit(0);
+            }
+        }
+    }
+    printf("Same results...\n");
 
     if (f != stdin)
         fclose(f);
-
-    // /************************/
-    // /* now write out matrix */
-    // /************************/
-
-    // mm_write_banner(stdout, matcode);
-    // mm_write_mtx_crd_size(stdout, M, N, nz);
-    // for (i = 0; i < nz; i++)
-    //     fprintf(stdout, "%d %d %20.19g\n", I[i] + 1, J[i] + 1, val[i]);
-
     return 0;
 }

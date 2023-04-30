@@ -17,7 +17,7 @@ adder-dcop-32:
 	./a.out Matrici/adder_dcop_32/adder_dcop_32.mtx 
 
 PR02R:
-	taskset -c 0,1,2,3 ./a.out Matrici/PR02R/PR02R.mtx 
+	./a.out Matrici/PR02R/PR02R.mtx 
 
 dc1:
 	./a.out Matrici/dc1/dc1.mtx 
@@ -28,6 +28,8 @@ raefsky2:
 mhd4800a:
 	./a.out Matrici/mhd4800a/mhd4800a.mtx 
 
+bcsstk17:
+	./a.out Matrici/bcsstk17/bcsstk17.mtx 
 
 max_nz_by_row:
 	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1813 " | wc -l
@@ -35,5 +37,8 @@ max_nz_by_row:
 print_elem_by_row:
 	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^331 "
 
-remote-copy:
+copy-all:
 	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA ludozarr99@160.80.85.52:/home/ludozarr99
+
+copy-file:
+	scp -i /home/ludovico99/.ssh/id_rsa  /home/ludovico99/Scrivania/Progetto-SCPA/Makefile ludozarr99@160.80.85.52:/home/ludozarr99/Progetto-SCPA
