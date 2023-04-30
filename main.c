@@ -5,8 +5,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "mmio.c"
+#define AUDIT if (0)
+#define BILLION 1000000000L
 
 void coo_to_ellpack(int rows, int columns, int nz, int *I, int *J, double *val, double **values, int **col_indices)
 {
@@ -137,8 +140,7 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
     offset = 0;
     int not_empty = 0;
     for (int i = 0; i < rows; i++)
-    {   
-        printf("OFFSET %d\n", offset);
+    {
         (*irp)[i] = offset;
         not_empty = 0;
         for (int j = 0; j < nz; j++)
@@ -151,10 +153,12 @@ void coo_to_CSR(int rows, int columns, int nz, int *I, int *J, double *val, doub
                 not_empty = 1;
             }
         }
-        if (!not_empty) (*irp)[i] = -1;
+        if (!not_empty)
+            (*irp)[i] = -1;
     }
 
-    if (offset != nz) {
+    if (offset != nz)
+    {
         printf("Error during CSR conversion has occured\n");
         exit(0);
     }
@@ -192,12 +196,10 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
 {
 
     double **y = NULL;
-    int *curr;
     int offset = 0;
-    int start_row = 0;
-    int end_row = 0;
+    struct timespec start, stop;
 
-    printf("Computing serial product ...\n");
+    AUDIT printf("Computing serial product ...\n");
     y = (double **)malloc(M * sizeof(double *));
     if (y == NULL)
     {
@@ -218,58 +220,151 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
             y[i][z] = 0.0;
         }
     }
-    printf("y correctly allocated ... \n");
+    AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    for (int i = 0; i < M; i++)
-    {   
-        if (i < (M - 1))
-        {
-            //int offset_row = offset;
-            for (int z = 0; z < K; z++)
-            {
-                printf("Computing y[%d][%d]\n", i, z);
-                //offset = offset_row;
-                printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
-                if (irp_A[i] == -1){
-                    printf("Row %d is the vector zero\n", i);
-                    break;
-                }
-
-                for (int j = irp_A[i]; j < irp_A[i + 1]; j++){
-                    
-                    y[i][z] += as_A[j] * X[ja_A[j]][z];
-                    //start_row++;
-                    //offset++;
-                }
-
-            }
-           
-        }
-        else
-        {
-            int offset_end = irp_A[i];
-            for (int z = 0; z < K; z++)
-            {   
-                printf("Computing y[%d][%d]\n", i, z);
-                offset = offset_end;
-                printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
-                while (offset < nz)
-                {
-                    y[i][z] += as_A[offset] * X[ja_A[offset]][z];
-                    offset++;
-                }
-            }
-        }
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
     }
-    printf("Completed serial product ...\n");
 
     for (int i = 0; i < M; i++)
     {
+        if (irp_A[i] == -1)
+        {
+            AUDIT printf("Row %d is the vector zero\n", i);
+            continue;
+            ;
+        }
         for (int z = 0; z < K; z++)
         {
-            printf("Value y[%d][%d] = %f\n", i, z, y[i][z]);
+            AUDIT printf("Computing y[%d][%d]\n", i, z);
+
+            if (i < (M - 1))
+                AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
+            else
+                AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
+
+            for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
+            {
+                y[i][z] += as_A[j] * X[ja_A[j]][z];
+            }
         }
     }
+    AUDIT printf("Completed serial product ...\n");
+
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
+
+    for (int i = 0; i < M; i++)
+    {
+        AUDIT printf("\n");
+        for (int z = 0; z < K; z++)
+        {
+            AUDIT printf("y[%d][%d] = %.66lf ", i, z, y[i][z]);
+        }
+    }
+
+    AUDIT printf("\n");
+    return y;
+}
+
+double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X, int nthread)
+{
+
+    double **y = NULL;
+    int offset = 0;
+
+    struct timespec start, stop;
+
+    AUDIT printf("Computing parallel product ...\n");
+    y = (double **)malloc(M * sizeof(double *));
+    if (y == NULL)
+    {
+        printf("Errore malloc per y\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < M; i++)
+    {
+        y[i] = (double *)malloc(K * sizeof(double));
+        if (y[i] == NULL)
+        {
+            printf("Errore malloc\n");
+            exit(1);
+        }
+        for (int z = 0; z < K; z++)
+        {
+            y[i][z] = 0.0;
+        }
+    }
+    AUDIT printf("y correctly allocated ... \n");
+
+    // calcola il prodotto matrice - multi-vettore
+    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    int chunck_size = M / 8;
+#pragma omp parallel for collapse (2) schedule(static, chunck_size) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, nthread, chunck_size) default(none)
+    for (int i = 0; i < M; i++)
+    {
+        // #pragma omp parallel for schedule(static, K/8) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, i) default(none)
+        for (int z = 0; z < K; z++)
+        {
+            if (irp_A[i] == -1)
+            {
+                AUDIT printf("Row %d is the vector zero\n", i);
+                y[i][z] = 0.0;
+            }
+            else
+            {
+                AUDIT printf("Computing y[%d][%d]\n", i, z);
+
+                if (i < (M - 1))
+                    AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
+                else
+                    AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
+
+                for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
+                {
+                    y[i][z] += as_A[j] * X[ja_A[j]][z];
+                }
+            }
+        }
+    }
+    AUDIT printf("Completed parallel product ...\n");
+    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
+    double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+    printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+
+    for (int i = 0; i < M; i++)
+    {
+        AUDIT printf("\n");
+        for (int z = 0; z < K; z++)
+        {
+            AUDIT printf("y[%d][%d] = %.66lf ", i, z, y[i][z]);
+        }
+    }
+
+    AUDIT printf("\n");
+
+    return y;
 }
 
 double **serial_product(int M, int N, int K, double **A, double **X)
@@ -308,6 +403,7 @@ double **serial_product(int M, int N, int K, double **A, double **X)
             }
         }
     }
+    return y;
 }
 
 void create_dense_matrix(int N, int K, double ***x)
@@ -343,11 +439,12 @@ int main(int argc, char *argv[])
     int ret_code;
     MM_typecode matcode;
     FILE *f;
-    int nthreads;
     int M, N, nz;
     int *I, *J;
     double *val;
-    double **y;
+    double **y_serial;
+    double **y_parallel;
+    int nthread = omp_get_num_procs();
 
     double **values = NULL;
     int **col_indices = NULL;
@@ -358,7 +455,7 @@ int main(int argc, char *argv[])
 
     double **X = NULL;
 
-    int K = 2; // It could be dynamic...
+    int K = 64; // It could be dynamic...
 
     if (argc < 2)
     {
@@ -389,8 +486,7 @@ int main(int argc, char *argv[])
         I = (int *)malloc(nz * sizeof(int));
         J = (int *)malloc(nz * sizeof(int));
         val = (double *)malloc(nz * sizeof(double));
-        nthreads = nz / 16;
-#pragma omp parallel for schedule(static, 16) shared(nz, I, J, val, f) num_threads(nthreads) default(none)
+#pragma omp parallel for schedule(static, 1) shared(nz, I, J, val, f) num_threads(nthread) default(none)
         for (int i = 0; i < nz; i++)
         {
             fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
@@ -401,10 +497,26 @@ int main(int argc, char *argv[])
 
         // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
         coo_to_CSR(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+
         // Creating a dense matrix ...
         create_dense_matrix(N, K, &X);
 
-        y = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
+        y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
+
+        y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
+
+        for (int i = 0; i < M; i++)
+        {
+            for (int z = 0; z < K; z++)
+            {
+                if (y_serial[i][z] != y_parallel[i][z])
+                {
+                    printf("Serial result is different ...");
+                    exit(0);
+                }
+            }
+        }
+        printf("Same results...\n");
     }
     else
     {
