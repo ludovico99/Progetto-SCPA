@@ -31,6 +31,9 @@ mhd4800a:
 bcsstk17:
 	./a.out Matrici/bcsstk17/bcsstk17.mtx 
 
+amazon0302:
+	./a.out Matrici/amazon0302/amazon0302.mtx 
+
 max_nz_by_row:
 	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1813 " | wc -l
 

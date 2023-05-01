@@ -112,13 +112,15 @@ void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *va
 
     printf("Starting CSR conversion ...\n");
     // Alloca memoria per gli array CSR
-    *as = (double *)malloc(nz * sizeof(double));
-    if (*as == NULL)
+    if (val != NULL)
     {
-        printf("Errore malloc per as\n");
-        exit(1);
+        *as = (double *)malloc(nz * sizeof(double));
+        if (*as == NULL)
+        {
+            printf("Errore malloc per as\n");
+            exit(1);
+        }
     }
-
     *ja = (int *)malloc(nz * sizeof(int));
     if (*ja == NULL)
     {
@@ -147,7 +149,8 @@ void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *va
         {
             if (I[j] == i)
             {
-                (*as)[offset] = val[j];
+                if (val != NULL)
+                    (*as)[offset] = val[j];
                 (*ja)[offset] = J[j];
                 offset++;
                 not_empty = 1;
@@ -184,11 +187,14 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
 
     printf("Starting parallel CSR conversion ...\n");
     // Alloca memoria per gli array CSR
-    *as = (double *)malloc(nz * sizeof(double));
-    if (*as == NULL)
+    if (val != NULL)
     {
-        printf("Errore malloc per as\n");
-        exit(1);
+        *as = (double *)malloc(nz * sizeof(double));
+        if (*as == NULL)
+        {
+            printf("Errore malloc per as\n");
+            exit(1);
+        }
     }
 
     *ja = (int *)malloc(nz * sizeof(int));
@@ -266,7 +272,8 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
         {
             if (I[j] == i)
             {
-                (*as)[my_offset] = val[j];
+                if (val != NULL)
+                    (*as)[my_offset] = val[j];
                 (*ja)[my_offset] = J[j];
                 my_offset++;
                 not_empty = 1;
@@ -334,7 +341,10 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
 
             for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
             {
-                y[i][z] += as_A[j] * X[ja_A[j]][z];
+                if (as_A != NULL)
+                    y[i][z] += as_A[j] * X[ja_A[j]][z];
+                else
+                    y[i][z] += 1.0 * X[ja_A[j]][z];
             }
         }
     }
@@ -424,7 +434,10 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
 
                 for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
                 {
-                    y[i][z] += as_A[j] * X[ja_A[j]][z];
+                    if (as_A != NULL)
+                        y[i][z] += as_A[j] * X[ja_A[j]][z];
+                    else
+                        y[i][z] += 1.0 * X[ja_A[j]][z];
                 }
             }
         }
@@ -598,33 +611,81 @@ int main(int argc, char *argv[])
     {
         if (mm_is_pattern(matcode))
         {
-            printf("TODO pattern matrix conversion");
-            return 0;
+            printf("PATTERN-SYMMETRIC MATRIX\n");
+            printf("Initial NZ for a symmetric matrix: %d\n", nz);
+            int computed_nz = nz * 2;
+            int i; // Raw index for the current nz
+            int j; // Column index for the current nz
+
+#pragma omp parallel for schedule(static, M / 8) shared(nz, i, j, f, M, computed_nz) num_threads(nthread) default(none)
+            for (int i = 0; i < nz; i++)
+            {
+                fscanf(f, "%d %d\n", &i, &j);
+                if (i == j){
+#pragma omp atomic
+                    computed_nz--;
+                }
+            }
+            f = init_stream(argv[1]);
+
+            I = (int *)malloc(computed_nz * sizeof(int));
+            J = (int *)malloc(computed_nz * sizeof(int));
+            val = NULL;
+
+            int counter = 0;
+#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz, counter) num_threads(nthread) default(none)
+            for (int i = 0; i < nz; i++)
+            {
+                fscanf(f, "%d %d\n", &I[i], &J[i]);
+                I[i]--; /* adjust from 1-based to 0-based */
+                J[i]--;
+
+                if (I[i] != J[i])
+                {
+
+                    I[nz + counter] = J[i];
+                    J[nz + counter] = I[i];
+
+#pragma omp atomic
+                    counter++;
+                }
+            }
+            if (counter != computed_nz - nz)
+            {
+                printf("Number of elements that are not on the diagonal is wrong\n");
+                exit(1);
+            }
+            nz = computed_nz;
+            printf("TOTAL NZ for a symmetric matrix: %d\n", nz);
         }
         else if (mm_is_real(matcode))
         {
             /* find out size of sparse matrix .... */
             if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
                 exit(1);
-
+            printf("REAL-SYMMETRIC MATRIX\n");
             printf("Initial NZ for a symmetric matrix: %d\n", nz);
             int computed_nz = nz * 2;
             int i; // Raw index for the current nz
             int j; // Column index for the current nz
             double value;
-            // Computing real value for nz;
+
+//#pragma omp parallel for schedule(static, M / 8) shared(nz, i, j, f, M, value, computed_nz) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d %lg\n", &i, &j, &value);
-                if (i == j)
+                if (i == j){
+#pragma omp atomic
                     computed_nz--;
+                }
             }
             f = init_stream(argv[1]);
             I = (int *)malloc(computed_nz * sizeof(int));
             J = (int *)malloc(computed_nz * sizeof(int));
             val = (double *)malloc(computed_nz * sizeof(double));
 
-#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz) num_threads(nthread) default(none)
+            int counter = 0;
+//#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz, counter) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
@@ -633,13 +694,20 @@ int main(int argc, char *argv[])
 
                 if (I[i] != J[i])
                 {
-                    if (nz + i < computed_nz)
-                    {
 
-                        I[nz + i] = J[i];
-                        J[nz + i] = I[i];
-                    }
+                    I[nz + counter] = J[i];
+                    J[nz + counter] = I[i];
+                    val[nz + counter] = val[i];
+
+        #pragma omp atomic
+                    counter++;
                 }
+            }
+
+            if (counter != computed_nz - nz)
+            {
+                printf("Number of elements that are not on the diagonal is wrong\n");
+                exit(1);
             }
 
             nz = computed_nz;
@@ -663,7 +731,7 @@ int main(int argc, char *argv[])
             I = (int *)malloc(nz * sizeof(int));
             J = (int *)malloc(nz * sizeof(int));
             val = NULL;
-#pragma omp parallel for schedule(static, 1) shared(nz, I, J, f) num_threads(nthread) default(none)
+#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, f, M) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d\n", &I[i], &J[i]);
@@ -682,7 +750,7 @@ int main(int argc, char *argv[])
             I = (int *)malloc(nz * sizeof(int));
             J = (int *)malloc(nz * sizeof(int));
             val = (double *)malloc(nz * sizeof(double));
-#pragma omp parallel for schedule(static, 1) shared(nz, I, J, val, f) num_threads(nthread) default(none)
+#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
@@ -706,8 +774,9 @@ int main(int argc, char *argv[])
         exit(1);
     }
     // coo_to_ellpack(M, N, nz, I, J, val, values, col_indices);
-     coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+
+    // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     // Creating a dense matrix ...
     create_dense_matrix(N, K, &X);
 
