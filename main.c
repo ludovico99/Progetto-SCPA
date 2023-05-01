@@ -617,12 +617,13 @@ int main(int argc, char *argv[])
             int i; // Raw index for the current nz
             int j; // Column index for the current nz
 
-#pragma omp parallel for schedule(static, M / 8) shared(nz, i, j, f, M, computed_nz) num_threads(nthread) default(none)
+//#pragma omp parallel for schedule(static, M / 8) shared(nz, i, j, f, M, computed_nz) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d\n", &i, &j);
-                if (i == j){
-#pragma omp atomic
+                if (i == j)
+                {
+//#pragma omp atomic
                     computed_nz--;
                 }
             }
@@ -633,7 +634,7 @@ int main(int argc, char *argv[])
             val = NULL;
 
             int counter = 0;
-#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz, counter) num_threads(nthread) default(none)
+//#pragma omp parallel for schedule(static, M / 8) shared(nz, I, J, val, f, M, computed_nz, counter) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d\n", &I[i], &J[i]);
@@ -646,7 +647,7 @@ int main(int argc, char *argv[])
                     I[nz + counter] = J[i];
                     J[nz + counter] = I[i];
 
-#pragma omp atomic
+//#pragma omp atomic
                     counter++;
                 }
             }
@@ -674,11 +675,13 @@ int main(int argc, char *argv[])
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d %lg\n", &i, &j, &value);
-                if (i == j){
-#pragma omp atomic
-                    computed_nz--;
+                if (i == j)
+                {
+                //#pragma omp atomic
+                    computed_nz --;
                 }
             }
+
             f = init_stream(argv[1]);
             I = (int *)malloc(computed_nz * sizeof(int));
             J = (int *)malloc(computed_nz * sizeof(int));
@@ -699,10 +702,11 @@ int main(int argc, char *argv[])
                     J[nz + counter] = I[i];
                     val[nz + counter] = val[i];
 
-        #pragma omp atomic
-                    counter++;
+                    //#pragma omp atomic
+                    counter ++;
                 }
             }
+
 
             if (counter != computed_nz - nz)
             {
