@@ -10,6 +10,8 @@
 #include "mmio.h"
 #include "header.h"
 
+#define SAMPLING_SIZE 100
+
 void create_dense_matrix(int N, int K, double ***x)
 {
 
@@ -80,7 +82,7 @@ int main(int argc, char *argv[])
 
     double **X = NULL;
 
-    int K = 2; // It could be dynamic...
+    int K[] = {3,4,8,12,16,32,64}; // It could be dynamic...
 
     if (argc < 2)
     {
@@ -318,8 +320,45 @@ int main(int argc, char *argv[])
 
     // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+
+    int mean;
+    double time;
+
+    FILE *f_samplings;
+    const char *filename = "samplings.csv";
+
+    f = fopen(filename, "w+");
+
+    for(int k = 0; k < 7; k++)
+    {
+        create_dense_matrix(N, K[k], &X);
+        for(int num_thread = 0; num_thread < nthread; num_thread++)
+        {
+            mean = 0;
+
+            for(int curr_samp = 0; curr_samp<SAMPLING_SIZE; curr_samp++)
+            {
+                parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X, &time);
+                mean += time;
+            }
+
+            mean = mean / SAMPLING_SIZE;
+
+            fprintf(f, "%d, %d, %lf\n", k, num_thread, mean);  
+            fflush(f);          
+        }
+
+        for(int i = 0; i < N; i++)
+        {
+            free(X[i]);
+        }
+
+        free(X);
+    }
+
+    fclose(f);
     
-    create_dense_matrix(N, K, &X);
+    //create_dense_matrix(N, K, &X);
 
     //y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
     //y_serial = serial_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
@@ -327,8 +366,9 @@ int main(int argc, char *argv[])
 
     //y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
     //y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
-    y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
+    //y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
 
+/*
     for (int i = 0; i < M; i++)
     {
         for (int z = 0; z < K; z++)
@@ -340,7 +380,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-    printf("Same results...\n");
+    printf("Same results...\n");*/
 
     if (f != stdin)
         fclose(f);
