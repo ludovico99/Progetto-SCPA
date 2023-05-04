@@ -113,10 +113,13 @@ int main(int argc, char *argv[])
         printf("Market Market type: [%s]\n", mm_typecode_to_str(matcode));
         exit(1);
     }
-    else if (mm_is_symmetric(matcode))
+
+    if (mm_is_symmetric(matcode))
     {
         if (mm_is_pattern(matcode))
-        {
+        {   
+            if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
+                exit(1);
             printf("PATTERN-SYMMETRIC MATRIX\n");
             printf("Initial NZ for a symmetric matrix: %d\n", nz);
             int computed_nz = nz * 2;
@@ -310,19 +313,21 @@ int main(int argc, char *argv[])
     }
 
     //int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
-    int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    //int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    int* nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
 
-    //coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     
-
     create_dense_matrix(N, K, &X);
 
-    y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
+    //y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
+    //y_serial = serial_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
     //y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
 
     //y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
-    y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
+    //y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
+    y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
 
     for (int i = 0; i < M; i++)
     {

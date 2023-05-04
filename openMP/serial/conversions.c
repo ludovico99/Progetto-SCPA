@@ -31,20 +31,23 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
     printf("MAX_NZ_PER_ROW is %d\n", max_nz_per_row);
 
     // Alloca memoria per gli array ELLPACK
-    *values = (double **)malloc(rows * sizeof(double *));
-    if (*values  == NULL)
+    if (val != NULL)
     {
-        printf("Errore malloc\n");
-        exit(1);
-    }
-
-    for (int k = 0; k < rows; k++)
-    {
-        (*values)[k] = (double *)malloc(max_nz_per_row * sizeof(double));
-        if ((*values)[k] == NULL)
+        *values = (double **)malloc(rows * sizeof(double *));
+        if (*values == NULL)
         {
             printf("Errore malloc\n");
             exit(1);
+        }
+
+        for (int k = 0; k < rows; k++)
+        {
+            (*values)[k] = (double *)malloc(max_nz_per_row * sizeof(double));
+            if ((*values)[k] == NULL)
+            {
+                printf("Errore malloc\n");
+                exit(1);
+            }
         }
     }
 
@@ -64,6 +67,8 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
         }
     }
 
+    printf("Malloc for ELLPACK data structures completed\n");
+
     // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
     for (int i = 0; i < rows; i++)
     {
@@ -72,18 +77,21 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
         {
             if (I[j] == i)
             {
-                (*values)[i][offset] = val[j];
+                if (val != NULL) (*values)[i][offset] = val[j];
                 (*col_indices)[i][offset] = J[j];
                 offset++;
             }
         }
-        
+
         for (k = offset; k < max_nz_per_row; k++)
         {
-            (*values)[i][k] = 0.0;
-            if (offset!= 0) (*col_indices)[i][k] = (*col_indices)[i][offset - 1];
-            else (*col_indices)[i][k] = -1;
+            if (val != NULL) (*values)[i][k] = 0.0;
+            if (offset != 0)
+                (*col_indices)[i][k] = (*col_indices)[i][offset - 1];
+            else
+                (*col_indices)[i][k] = -1;
         }
+        printf("row %d completed\n", i);
     }
 
     //   for (int j = 0; j < rows; j++)

@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "unistd.h": "c",
-        "omp.h": "c",
-        "time.h": "c",
-        "type_traits": "c",
-        "stdlib.h": "c"
-    }
-}
