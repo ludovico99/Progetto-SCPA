@@ -207,7 +207,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     return y;
 }
 
-double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X)
+double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X, double * time)
 {
 
     double **y = NULL;
@@ -281,6 +281,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     }
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 

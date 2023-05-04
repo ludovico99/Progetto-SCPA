@@ -321,13 +321,13 @@ int main(int argc, char *argv[])
     // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
 
-    int mean;
+    double mean;
     double time;
 
     FILE *f_samplings;
     const char *filename = "samplings.csv";
 
-    f = fopen(filename, "w+");
+    f_samplings = fopen(filename, "w+");
 
     for(int k = 0; k < 7; k++)
     {
@@ -338,25 +338,24 @@ int main(int argc, char *argv[])
 
             for(int curr_samp = 0; curr_samp<SAMPLING_SIZE; curr_samp++)
             {
-                parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X, &time);
+                parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time);
                 mean += time;
             }
 
             mean = mean / SAMPLING_SIZE;
 
-            fprintf(f, "%d, %d, %lf\n", k, num_thread, mean);  
-            fflush(f);          
+            fprintf(f_samplings, "%d, %d, %lf\n", k, num_thread, mean);  
+            fflush(f_samplings);          
         }
 
         for(int i = 0; i < N; i++)
-        {
+        {   
             free(X[i]);
         }
-
-        free(X);
+        if (X != NULL) free(X);
     }
 
-    fclose(f);
+    fclose(f_samplings);
     
     //create_dense_matrix(N, K, &X);
 

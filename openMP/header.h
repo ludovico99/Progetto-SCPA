@@ -22,7 +22,7 @@ extern int *coo_to_ellpack_no_zero_padding_parallel(int , int , int , int *, int
 
 extern double ** parallel_product_CSR(int, int, int, int, double *, int *, int *, double **, int );
 extern double ** parallel_product_ellpack(int , int , int , int , double **, int **, double **);
-extern double ** parallel_product_ellpack_no_zero_padding(int , int , int , int*, double **, int **, double **, *double);
+extern double ** parallel_product_ellpack_no_zero_padding(int , int , int , int*, double **, int **, double **, double*);
 
 
 #endif
