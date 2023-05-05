@@ -9,7 +9,7 @@
 
 #include "../header.h"
 
-double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X, int nthread)
+double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X,double * time, int nthread)
 {
 
     double **y = NULL;
@@ -42,7 +42,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     AUDIT printf("y correctly allocated ... \n");
 
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -85,16 +85,16 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
             }
         }
     }
-    printf("Completed parallel product ...\n");
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
-
+    AUDIT printf("Completed parallel product ...\n");
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
-    printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+   AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
     for (int i = 0; i < M; i++)
     {
@@ -110,13 +110,12 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     return y;
 }
 
-double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X)
+double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X, double *time, int nthread)
 {
 
     double **y = NULL;
     int offset = 0;
     struct timespec start, stop;
-    int nthread = omp_get_num_procs();
     int chunk_size = 0;
 
     printf("Computing parallel product ...\n");
@@ -142,7 +141,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -181,15 +180,16 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
             }
         }
     }
-    AUDIT printf("Completed parallel product ...\n");
-
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+   
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
+    AUDIT printf("Completed parallel product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
@@ -207,13 +207,12 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     return y;
 }
 
-double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X, double * time)
+double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X, double * time, int nthread)
 {
 
     double **y = NULL;
     int offset = 0;
     struct timespec start, stop;
-    int nthread = omp_get_num_procs();
     int chunk_size = 0;
 
     printf("Computing parallel product ...\n");
@@ -239,7 +238,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -258,7 +257,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
 
         for (int z = 0; z < K; z++)
         {
-            AUDIT printf("Computing y[%d][%d]\n", i, z);
+            //AUDIT printf("Computing y[%d][%d]\n", i, z);
             if (nz_per_row[i] == 0) {
                 y[i][z] = 0.0;
                 continue;
@@ -272,9 +271,9 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
             }
         }
     }
-    AUDIT printf("Completed parallel product ...\n");
+    //AUDIT printf("Completed parallel product ...\n");
 
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);

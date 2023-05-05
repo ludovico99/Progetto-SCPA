@@ -10,6 +10,7 @@
 #include "mmio.h"
 #include "header.h"
 
+
 #define SAMPLING_SIZE 100
 
 void create_dense_matrix(int N, int K, double ***x)
@@ -82,7 +83,7 @@ int main(int argc, char *argv[])
 
     double **X = NULL;
 
-    int K[] = {3,4,8,12,16,32,64}; // It could be dynamic...
+    int K[] = {3, 4, 8, 12, 16, 32, 64}; // It could be dynamic...
 
     if (argc < 2)
     {
@@ -119,28 +120,28 @@ int main(int argc, char *argv[])
     if (mm_is_symmetric(matcode))
     {
         if (mm_is_pattern(matcode))
-        {   
+        {
             if ((ret_code = mm_read_mtx_crd_size(f, &M, &N, &nz)) != 0)
                 exit(1);
             printf("PATTERN-SYMMETRIC MATRIX\n");
             printf("Initial NZ for a symmetric matrix: %d\n", nz);
             int computed_nz = nz * 2;
-            int row; // Raw index for the current nz
+            int row;    // Raw index for the current nz
             int column; // Column index for the current nz
-           if (nz % nthread == 0)
+            if (nz % nthread == 0)
             {
                 chunk_size = nz / nthread;
             }
             else
                 chunk_size = nz / nthread + 1;
 
-          #pragma omp parallel for schedule(static, chunk_size) shared(nz, f, M, computed_nz, chunk_size) private (row, column) num_threads(nthread) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(nz, f, M, computed_nz, chunk_size) private(row, column) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d\n", &row, &column);
                 if (row == column)
                 {
-                 #pragma omp atomic
+#pragma omp atomic
                     computed_nz--;
                 }
             }
@@ -151,7 +152,7 @@ int main(int argc, char *argv[])
             val = NULL;
 
             int counter = 0;
-            #pragma omp parallel for schedule(static,chunk_size) shared(nz, I, J, f, chunk_size, computed_nz, counter) num_threads(nthread) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(nz, I, J, f, chunk_size, computed_nz, counter) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d\n", &I[i], &J[i]);
@@ -164,7 +165,7 @@ int main(int argc, char *argv[])
                     I[nz + counter] = J[i];
                     J[nz + counter] = I[i];
 
-                    #pragma omp atomic
+#pragma omp atomic
                     counter++;
                 }
             }
@@ -184,7 +185,7 @@ int main(int argc, char *argv[])
             printf("REAL-SYMMETRIC MATRIX\n");
             printf("Initial NZ for a symmetric matrix: %d\n", nz);
             int computed_nz = nz * 2;
-            int row; // Raw index for the current nz
+            int row;    // Raw index for the current nz
             int column; // Column index for the current nz
             double value;
 
@@ -195,7 +196,7 @@ int main(int argc, char *argv[])
             else
                 chunk_size = nz / nthread + 1;
 
-#pragma omp parallel for schedule(static, chunk_size) shared(nz, f, computed_nz, chunk_size) private (row, column, value) num_threads(nthread) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(nz, f, computed_nz, chunk_size) private(row, column, value) num_threads(nthread) default(none)
             for (int i = 0; i < nz; i++)
             {
                 fscanf(f, "%d %d %lg\n", &row, &column, &value);
@@ -226,7 +227,7 @@ int main(int argc, char *argv[])
                     J[nz + counter] = I[e];
                     val[nz + counter] = val[e];
 
-                 #pragma omp atomic
+#pragma omp atomic
                     counter++;
                 }
             }
@@ -258,7 +259,7 @@ int main(int argc, char *argv[])
             I = (int *)malloc(nz * sizeof(int));
             J = (int *)malloc(nz * sizeof(int));
             val = NULL;
-             if (nz % nthread == 0)
+            if (nz % nthread == 0)
             {
                 chunk_size = nz / nthread;
             }
@@ -314,72 +315,87 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    //int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
-    //int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
-    int* nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    // int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
+    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
 
     // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    //coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
 
     double mean;
     double time;
 
     FILE *f_samplings;
-    const char *filename = "samplings.csv";
-
-    f_samplings = fopen(filename, "w+");
-
-    for(int k = 0; k < 7; k++)
+    
+    #ifdef PARALLEL_SAMPLING
+        const char *filename = "samplings_parallel.csv";
+        f_samplings = fopen(filename, "w+");
+        fprintf(f_samplings, "K,num_threads,mean\n");
+    #else
+        const char *filename = "samplings_serial.csv";
+        f_samplings = fopen(filename, "w+");
+        fprintf(f_samplings, "K,mean\n");
+    #endif
+    
+    
+    for (int k = 0; k < 7; k++)
     {
         create_dense_matrix(N, K[k], &X);
-        for(int num_thread = 0; num_thread < nthread; num_thread++)
-        {
+        #ifdef PARALLEL_SAMPLING
+        for (int num_thread = 1; num_thread <= nthread; num_thread++){
+        #endif
             mean = 0;
 
-            for(int curr_samp = 0; curr_samp<SAMPLING_SIZE; curr_samp++)
-            {
-                parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time);
+            for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+            {   
+                #ifdef PARALLEL_SAMPLING
+                    parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
+                    // y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, &time, num_thread);
+                    // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time, num_thread)
+                #else
+                    y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X,  &time);
+                    // y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, &time);
+                    // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time);
+                #endif
+
                 mean += time;
             }
 
             mean = mean / SAMPLING_SIZE;
+        #ifdef PARALLEL_SAMPLING
+            fprintf(f_samplings, "%d,%d,%lf\n", K[k], num_thread, mean);
+            fflush(f_samplings);
+            }
+        #else 
+            fprintf(f_samplings, "%d,%lf\n", K[k], mean);
+            fflush(f_samplings);
+        #endif
 
-            fprintf(f_samplings, "%d, %d, %lf\n", k, num_thread, mean);  
-            fflush(f_samplings);          
-        }
-
-        for(int i = 0; i < N; i++)
-        {   
+        for (int i = 0; i < N; i++)
+        {
             free(X[i]);
         }
-        if (X != NULL) free(X);
+        if (X != NULL)
+            free(X);
     }
 
     fclose(f_samplings);
-    
-    //create_dense_matrix(N, K, &X);
 
-    //y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
-    //y_serial = serial_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
-    //y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X);
+    // create_dense_matrix(N, K, &X);
 
-    //y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, nthread);
-    //y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X);
-    //y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K, nz_per_row, values, col_indices, X);
-
-/*
-    for (int i = 0; i < M; i++)
-    {
-        for (int z = 0; z < K; z++)
+    /*
+        for (int i = 0; i < M; i++)
         {
-            if (y_serial[i][z] != y_parallel[i][z])
+            for (int z = 0; z < K; z++)
             {
-                printf("Serial result is different ...");
-                exit(0);
+                if (y_serial[i][z] != y_parallel[i][z])
+                {
+                    printf("Serial result is different ...");
+                    exit(0);
+                }
             }
         }
-    }
-    printf("Same results...\n");*/
+        printf("Same results...\n");*/
 
     if (f != stdin)
         fclose(f);

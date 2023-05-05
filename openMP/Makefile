@@ -1,5 +1,9 @@
-all:
+
+all-serial:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
+
+all-parallel:
+	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DPARALLEL_SAMPLING -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
 matrice_prova:
 	./openMP ../Matrici/prova.mtx 

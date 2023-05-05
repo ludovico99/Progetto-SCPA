@@ -9,7 +9,7 @@
 
 #include "../header.h"
 
-double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X)
+double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X, double *time)
 {
 
     double **y = NULL;
@@ -39,7 +39,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -49,18 +49,17 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     {
         if (irp_A[i] == -1)
         {
-            AUDIT printf("Row %d is the vector zero\n", i);
+            //AUDIT printf("Row %d is the vector zero\n", i);
             continue;
-            ;
         }
         for (int z = 0; z < K; z++)
         {
-            AUDIT printf("Computing y[%d][%d]\n", i, z);
+            // AUDIT printf("Computing y[%d][%d]\n", i, z);
 
-            if (i < (M - 1))
-                AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
-            else
-                AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
+            // if (i < (M - 1))
+            //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
+            // else
+            //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
 
             for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
             {
@@ -71,15 +70,16 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
             }
         }
     }
-    AUDIT printf("Completed serial product ...\n");
-
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+   
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
+    AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
     printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 
@@ -96,7 +96,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     return y;
 }
 
-double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X)
+double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X, double *time)
 {
 
     double **y = NULL;
@@ -126,7 +126,7 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -138,7 +138,7 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
 
         for (int z = 0; z < K; z++)
         {
-            AUDIT printf("Computing y[%d][%d]\n", i, z);
+            //AUDIT printf("Computing y[%d][%d]\n", i, z);
 
             for (int j = 0; j < max_nz_per_row; j++)
             {
@@ -158,15 +158,16 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
             }
         }
     }
-    AUDIT printf("Completed serial product ...\n");
 
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
+    AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
     printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 
@@ -224,7 +225,7 @@ double **serial_product(int M, int N, int K, double **A, double **X)
 }
 
 
-double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X)
+double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X, double* time)
 {
 
     double **y = NULL;
@@ -254,7 +255,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_REALTIME, &start) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
@@ -282,13 +283,14 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per
     }
     AUDIT printf("Completed serial product ...\n");
 
-    if (clock_gettime(CLOCK_REALTIME, &stop) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+    *time = accum;
 
     printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 
