@@ -4,20 +4,18 @@ import numpy as np
 	
 import scipy.stats as stats
 
-# def confidence_band_t(mean, std_dev, n):
-#     t_score = stats.t.ppf(0.975, n-1)
-#      z_score = stats.norm.ppf(0.975)
-#     lower = []
-#     upper = []
-#     for i in range(len(mean_seq)):
-#         lower.append(mean_seq[i] - z_score * np.sqrt(var_seq[i] / n_seq[i]))
-#         upper.append(mean_seq[i] + z_score * np.sqrt(var_seq[i] / n_seq[i]))
-#     return lower, upper
-
-
 def print_all_results(samplings_parallel,sampling_serial, k):
 
 	n = 30
+	x = samplings_parallel[0]
+	mean = samplings_parallel[1]
+	variance = samplings_parallel[2]
+	std = np.sqrt(variance)
+
+	serial_mean = sampling_serial[0]
+	serial_variance = sampling_serial[1]
+	std_serial = np.sqrt(serial_variance)
+
 	plt.style.use('seaborn-v0_8')
 	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='x')
 	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='y')
@@ -25,16 +23,23 @@ def print_all_results(samplings_parallel,sampling_serial, k):
 	fig, ax = plt.subplots()
 	fig.set_size_inches(16, 9)
 
-	ax.plot(samplings_parallel[0], samplings_parallel[1],marker='o', markersize=2, label="Mean value with K fixed and variable num_thread", linewidth=2.0, color='indigo')
-	# lower, upper = confidence_band_t(samplings_parallel[1], samplings_parallel[2], len(samplings_parallel[1]))
-	mean = samplings_parallel[1]
-	variance = samplings_parallel[2]
-	std = np.sqrt(variance)
-	ci = stats.t.interval(0.95, n-1, loc = mean, scale=std/np.sqrt(n))
-	plt.fill_between(samplings_parallel[0], ci[0], ci[1],
+	ax.plot(x, mean,marker='o', markersize=2, label="Mean value with K fixed and variable num_thread", linewidth=0.5, color='indigo')
+
+	ci = stats.t.interval(0.995, n-1, loc = mean, scale=std/np.sqrt(n))
+
+	ax.fill_between(x, ci[0], ci[1],
                     color='darkviolet', alpha=0.1,
                     label="Confidence band of 95")
-	ax.scatter(1, sampling_serial[0], label="Mean value for serial product with K fixed", color='red')
+
+
+	
+	ax.scatter(1, serial_mean, label="Mean value for serial product with K fixed", color='red')
+
+	ci = stats.t.interval(0.995, n-1, loc = serial_mean, scale=std_serial/np.sqrt(n))
+	ax.fill_between([1], ci[0], ci[1],
+                    color='red', alpha=0.1,
+                    label="Confidence band of 95")
+
 	ax.legend(loc='upper right', shadow=True, fontsize=10)
 
 	plt.title("Plot di (num_threads, media dei tempi) fissato K ={} ".format(k), fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
@@ -58,10 +63,11 @@ samplings_64_parallel  = [[],[],[]]
 
 
 # Leggo le misure delle prestazioni per il parallelo
-# df_parallel = pandas.read_csv("samplings_parallel_ELLPACK.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
-df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
+df_parallel = pandas.read_csv("samplings_parallel_ELLPACK.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
+#df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
 
 for row in df_parallel.itertuples(index= False):
+
 	try:	
 		if(row[0] == 3):
 			samplings_3_parallel[0].append(row[1])
@@ -98,8 +104,8 @@ for row in df_parallel.itertuples(index= False):
 		exit(1)
 
 # Leggo le misure delle prestazioni per il seriale
-#df_serial = pandas.read_csv("samplings_serial_ELLPACK.csv", dtype={'K': 'int64','mean': 'float64', 'variance': 'float64'})
-df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
+df_serial = pandas.read_csv("samplings_serial_ELLPACK.csv", dtype={'K': 'int64','mean': 'float64', 'variance': 'float64'})
+#df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
 
 samplings_3_serial = []
 samplings_4_serial  = []
@@ -111,6 +117,7 @@ samplings_64_serial  = []
 
 for row in df_serial.itertuples(index= False):
 	try:	
+	
 		if(row[0] == 3):
 			samplings_3_serial.append(row[1])
 			samplings_3_serial.append(row[2])
