@@ -94,18 +94,18 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     *time = accum;
 
-   AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+    AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
-    for (int i = 0; i < M; i++)
-    {
-        AUDIT printf("\n");
-        for (int z = 0; z < K; z++)
-        {
-            AUDIT printf("y[%d][%d] = %.66lf ", i, z, y[i][z]);
-        }
-    }
+    // for (int i = 0; i < M; i++)
+    // {
+    //     AUDIT printf("\n");
+    //     for (int z = 0; z < K; z++)
+    //     {
+    //         AUDIT printf("y[%d][%d] = %.66lf ", i, z, y[i][z]);
+    //     }
+    // }
 
-    AUDIT printf("\n");
+    // AUDIT printf("\n");
 
     return y;
 }

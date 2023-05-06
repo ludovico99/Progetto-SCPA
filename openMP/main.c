@@ -11,7 +11,7 @@
 #include "header.h"
 
 
-#define SAMPLING_SIZE 100
+#define SAMPLING_SIZE 10
 
 void create_dense_matrix(int N, int K, double ***x)
 {
@@ -417,11 +417,14 @@ int main(int argc, char *argv[])
                 }
 
                 mean = mean / SAMPLING_SIZE;
+                
             #ifdef PARALLEL_SAMPLING
+                printf("MEAN for K %d, num_thread %d is %lf\n", K[k], num_thread, mean);
                 fprintf(f_samplings, "%d,%d,%lf\n", K[k], num_thread, mean);
                 fflush(f_samplings);
                 }
             #else 
+                printf("MEAN for K %d is %lf\n", K[k], mean);
                 fprintf(f_samplings, "%d,%lf\n", K[k], mean);
                 fflush(f_samplings);
             #endif
@@ -454,6 +457,7 @@ int main(int argc, char *argv[])
                 }
 
                 mean = mean / SAMPLING_SIZE;
+                printf("MEAN for K %d, num_thread %d is %lf\n", K[k], num_thread, mean);
                 fprintf(f_samplings_parallel, "%d,%d,%lf\n", K[k], num_thread, mean);
                 fflush(f_samplings_parallel);
             }
@@ -485,6 +489,7 @@ int main(int argc, char *argv[])
                 }
 
                 mean = mean / SAMPLING_SIZE;
+                printf("MEAN for K %d is %lf\n", K[k], mean);
                 fprintf(f_samplings_serial, "%d,%lf\n", K[k], mean);
                 fflush(f_samplings_serial);
             
