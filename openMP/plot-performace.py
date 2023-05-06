@@ -4,7 +4,7 @@ import numpy as np
 	
 def print_all_results(samplings_parallel,sampling_serial, k):
 
-	plt.style.use('seaborn')
+	plt.style.use('seaborn-v0_8')
 	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0, axis='x')
 	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='y')
 	
@@ -38,8 +38,6 @@ samplings_64_parallel  = [[],[]]
 # Leggo le misure delle prestazioni per il parallelo
 df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
 
-print("Stampa campionamenti esecuzione parallela...")
-
 for row in df_parallel.itertuples(index= False):
 	try:	
 		if(row[0] == 3):
@@ -71,9 +69,6 @@ for row in df_parallel.itertuples(index= False):
 
 # Leggo le misure delle prestazioni per il seriale
 df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
-
-print("Stampa campionamenti esecuzione parallela...")
-
 
 for row in df_serial.itertuples(index= False):
 	try:	
