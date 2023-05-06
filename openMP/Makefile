@@ -52,7 +52,7 @@ print_elem_by_row:
 	cat ../Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^331 "
 
 copy-all:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/openMP ludozarr99@160.80.85.52:/home/ludozarr99/Progetto-SCPA/
+	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA ludozarr99@160.80.85.52:/home/ludozarr99/
 
 copy-file:
 	scp -i /home/ludovico99/.ssh/id_rsa  /home/ludovico99/Scrivania/Progetto-SCPA/openMP/Makefile ludozarr99@160.80.85.52:/home/ludozarr99/Progetto-SCPA/openMP
