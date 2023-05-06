@@ -16,7 +16,7 @@
 void create_dense_matrix(int N, int K, double ***x)
 {
 
-    printf("Creating dense matrix ...\n");
+    AUDIT printf("Creating dense matrix ...\n");
     *x = (double **)malloc(N * sizeof(double *));
     if (*x == NULL)
     {
@@ -38,7 +38,7 @@ void create_dense_matrix(int N, int K, double ***x)
         }
     }
 
-    printf("Completed dense matrix creation...\n");
+    AUDIT  printf("Completed dense matrix creation...\n");
 }
 
 FILE *init_stream(const char *filename)
@@ -74,12 +74,15 @@ int main(int argc, char *argv[])
 
     int chunk_size = 0;
 
-    double **values = NULL;
-    int **col_indices = NULL;
+    #ifdef ELLPACK
+        double **values = NULL;
+        int **col_indices = NULL;
+    #else 
+        double *as_A = NULL;
+        int *ja_A = NULL;
+        int *irp_A = NULL;
+    #endif 
 
-    double *as_A = NULL;
-    int *ja_A = NULL;
-    int *irp_A = NULL;
 
     double **X = NULL;
 
@@ -315,73 +318,192 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    // int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
-    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
-    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
-
-    // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-
-    double mean;
-    double time;
-
-    FILE *f_samplings;
-    
-    #ifdef PARALLEL_SAMPLING
-        const char *filename = "samplings_parallel.csv";
-        f_samplings = fopen(filename, "w+");
-        fprintf(f_samplings, "K,num_threads,mean\n");
+    #ifdef ELLPACK
+        // int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
+        // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
+        int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
+        
     #else
-        const char *filename = "samplings_serial.csv";
-        f_samplings = fopen(filename, "w+");
-        fprintf(f_samplings, "K,mean\n");
+        //coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+        coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     #endif
     
+
     
-    for (int k = 0; k < 7; k++)
-    {
-        create_dense_matrix(N, K[k], &X);
-        #ifdef PARALLEL_SAMPLING
-        for (int num_thread = 1; num_thread <= nthread; num_thread++){
+
+    #ifdef BOTH
+        double mean;
+        double time;
+        const char *filename; 
+
+        FILE *f_samplings_serial;
+        FILE *f_samplings_parallel;
+        #ifdef ELLPACK
+            filename = "samplings_parallel_ELLPACK.csv";
+            f_samplings_parallel = fopen(filename, "w+");
+            fprintf(f_samplings_parallel, "K,num_threads,mean\n");
+
+            filename = "samplings_serial_ELLPACK.csv";
+            f_samplings_serial = fopen(filename, "w+");
+            fprintf(f_samplings_serial, "K,mean\n");
+        #else
+            filename = "samplings_parallel_CSR.csv";
+            f_samplings_parallel = fopen(filename, "w+");
+            fprintf(f_samplings_parallel, "K,num_threads,mean\n");
+
+            filename = "samplings_serial_CSR.csv";
+            f_samplings_serial = fopen(filename, "w+");
+            fprintf(f_samplings_serial, "K,mean\n");
         #endif
+
+    #else
+
+        double mean;
+        double time;
+        const char *filename; 
+        FILE *f_samplings;
+        #ifdef PARALLEL_SAMPLING
+            #ifdef ELLPACK
+                filename = "samplings_parallel_ELLPACK.csv";
+                f_samplings = fopen(filename, "w+");
+                fprintf(f_samplings, "K,num_threads,mean\n");
+            #else
+                filename = "samplings_parallel_CSR.csv";
+                f_samplings = fopen(filename, "w+");
+                fprintf(f_samplings, "K,num_threads,mean\n");
+            #endif
+        #else
+            #ifdef ELLPACK
+                filename = "samplings_serial_ELLPACK.csv";
+                f_samplings = fopen(filename, "w+");
+                fprintf(f_samplings, "K,mean\n");
+            #else
+                filename = "samplings_serial_CSR.csv";
+                f_samplings = fopen(filename, "w+");
+                fprintf(f_samplings, "K,mean\n");
+            #endif
+        #endif
+    #endif
+    
+    #ifndef BOTH 
+        for (int k = 0; k < 7; k++)
+        {
+            create_dense_matrix(N, K[k], &X);
+            #ifdef PARALLEL_SAMPLING
+            for (int num_thread = 1; num_thread <= nthread; num_thread++){
+            #endif
+                mean = 0;
+
+                for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+                {   
+                    #ifdef ELLPACK
+                        #ifdef PARALLEL_SAMPLING
+                            y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
+                            // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time, num_thread)
+                        #else
+                            y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X,  &time);
+                            // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time);
+                        #endif
+                        
+                    #else
+                        #ifdef PARALLEL_SAMPLING
+                            y_parallel = parallel_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time, num_thread); 
+                        #else
+                            y_serial = serial_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time);
+                        #endif
+                    #endif
+
+                    mean += time;
+                }
+
+                mean = mean / SAMPLING_SIZE;
+            #ifdef PARALLEL_SAMPLING
+                fprintf(f_samplings, "%d,%d,%lf\n", K[k], num_thread, mean);
+                fflush(f_samplings);
+                }
+            #else 
+                fprintf(f_samplings, "%d,%lf\n", K[k], mean);
+                fflush(f_samplings);
+            #endif
+
+            for (int i = 0; i < N; i++)
+            {
+                free(X[i]);
+            }
+            if (X != NULL)
+                free(X);
+        }
+    #else 
+    
+        for (int k = 0; k < 7; k++)
+        {
+            create_dense_matrix(N, K[k], &X);
+            for (int num_thread = 1; num_thread <= nthread; num_thread++){
+                mean = 0;
+
+                for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+                {   
+                    #ifdef ELLPACK
+                        y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
+                        // y_parallel = parallel_product_ellpack(M, N, K[k], max_nz_per_row, values, col_indices, X, &time, num_thread)
+                    #else
+                        y_parallel = parallel_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time, num_thread); 
+                    #endif
+
+                    mean += time;
+                }
+
+                mean = mean / SAMPLING_SIZE;
+                fprintf(f_samplings_parallel, "%d,%d,%lf\n", K[k], num_thread, mean);
+                fflush(f_samplings_parallel);
+            }
+
+            for (int i = 0; i < N; i++)
+            {
+                free(X[i]);
+            }
+            if (X != NULL)
+                free(X);
+        }
+
+        for (int k = 0; k < 7; k++)
+        {
+            create_dense_matrix(N, K[k], &X);
+            
             mean = 0;
 
             for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
             {   
-                #ifdef PARALLEL_SAMPLING
-                    parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
-                    // y_parallel = parallel_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, &time, num_thread);
-                    // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time, num_thread)
-                #else
-                    y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X,  &time);
-                    // y_serial = serial_product_CSR(M, N, K, nz, as_A, ja_A, irp_A, X, &time);
-                    // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time);
-                #endif
+                    #ifdef ELLPACK
+                        y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X,  &time);
+                        // y_serial = serial_product_ellpack(M, N, K[k], max_nz_per_row, values, col_indices, X, &time);
+                    #else
+                        y_serial = serial_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time);
+                    #endif
 
-                mean += time;
+                    mean += time;
+                }
+
+                mean = mean / SAMPLING_SIZE;
+                fprintf(f_samplings_serial, "%d,%lf\n", K[k], mean);
+                fflush(f_samplings_serial);
+            
+
+            for (int i = 0; i < N; i++)
+            {
+                free(X[i]);
             }
-
-            mean = mean / SAMPLING_SIZE;
-        #ifdef PARALLEL_SAMPLING
-            fprintf(f_samplings, "%d,%d,%lf\n", K[k], num_thread, mean);
-            fflush(f_samplings);
-            }
-        #else 
-            fprintf(f_samplings, "%d,%lf\n", K[k], mean);
-            fflush(f_samplings);
-        #endif
-
-        for (int i = 0; i < N; i++)
-        {
-            free(X[i]);
+            if (X != NULL)
+                free(X);
         }
-        if (X != NULL)
-            free(X);
-    }
+    #endif
 
-    fclose(f_samplings);
-
-    // create_dense_matrix(N, K, &X);
+    #ifndef BOTH
+        fclose(f_samplings);
+    #else 
+        fclose(f_samplings_serial);
+        fclose(f_samplings_parallel);
+    #endif
 
     /*
         for (int i = 0; i < M; i++)

@@ -1,7 +1,7 @@
 import pandas
 import matplotlib.pyplot as plt
 		
-def point:
+class point:
 	def __init__(self,num_threads,mean):
 		self.num_threads = num_threads
 		self.mean = mean
@@ -11,7 +11,7 @@ def print_all_results(samplings_x,k):
 
 	plt.plot(samplings_x[0], samplings_x[1])
 	
-	plt.title("K = ",k)
+	plt.title("K = {}".format(k))
 	
 	plt.xlabel("Numero Thread")
 	
@@ -32,41 +32,39 @@ samplings_64 = [[],[]]
 
 
 # Leggo le misure delle prestazioni per il parallelo
-df_parallel = pandas.read_csv("samplings_parallel.csv")
-
-df_parallel = df.reset_index()
+df_parallel = pandas.read_csv("samplings_parallel.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
 
 print("Stampa campionamenti esecuzione parallela...")
 
-for index, row in df_serial.iterrrows():
+for row in df_parallel.itertuples(index= False):
 	try:	
-		samplings.append(sampling(row['K'], row['num_threads'], row['mean']))
-		
-		if(row['K'] == '3'):
-			samplings_3[0].append(point(row['num_threads']))
-			samplings_3[1].append(point(row['mean']))
-		elif(row['K'] == 4):
-			samplings_4[0].append(point(row['num_threads']))
-			samplings_4[1].append(point(row['mean']))
-		elif(row['K'] == 8):
-			samplings_8[0].append(point(row['num_threads']))
-			samplings_8[1].append(point(row['mean']))
-		elif(row['K'] == 12):
-			samplings_12[0].append(point(row['num_threads'])
-			samplings_12[1].append(point(row['mean'])
-		elif(row['K'] == 16):
-			samplings_16[0].append(point(row['num_threads']))
-			samplings_16[1].append(point(row['mean']))
-		elif(row['K'] == 32):
-			samplings_32[0].append(point(row['num_threads']))
-			samplings_32[1].append(point(row['mean']))
-		elif(row['K'] == 64):
-			samplings_64[0].append(point(row['num_threads']))
-			samplings_64[1].append(point(row['mean']))
+		print(row[0], row[1], row[2])
+		if(row[0] == 3):
+			print(row[0], row[1], row[2])
+			samplings_3[0].append(row[1])
+			samplings_3[1].append(row[2])
+		elif(row[0] == 4):
+			samplings_4[0].append(row[1])
+			samplings_4[1].append(row[2])
+		elif(row[0] == 8):
+			samplings_8[0].append(row[1])
+			samplings_8[1].append(row[2])
+		elif(row[0] == 12):
+			samplings_12[0].append(row[1])
+			samplings_12[1].append(row[2])
+		elif(row[0] == 16):
+			samplings_16[0].append(row[1])
+			samplings_16[1].append(row[2])
+		elif(row[0] == 32):
+			samplings_32[0].append(row[1])
+			samplings_32[1].append(row[2])
+		elif(row[0] == 64):
+			samplings_64[0].append(row[1])
+			samplings_64[1].append(row[2])
 		else:
 			print("Valore di K non ammissibile.")
 	except:
-		print("Errore nella lettura della riga ", index)
+		print("Errore nella lettura della riga ")
 		exit(1)
 		
 print("Numero di campioni per k = 3: ", len(samplings_3[0]))
@@ -87,4 +85,3 @@ print_all_results(samplings_64, '64')
 
 print("I dati sono stati letti con successo.")
 
-print(df.to_string())

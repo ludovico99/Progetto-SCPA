@@ -18,7 +18,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
 
     struct timespec start, stop;
 
-    printf("Computing parallel product ...\n");
+    AUDIT printf("Computing parallel product ...\n");
     y = (double **)malloc(M * sizeof(double *));
     if (y == NULL)
     {
@@ -118,7 +118,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     struct timespec start, stop;
     int chunk_size = 0;
 
-    printf("Computing parallel product ...\n");
+    AUDIT printf("Computing parallel product ...\n");
     y = (double **)malloc(M * sizeof(double *));
     if (y == NULL)
     {
@@ -191,7 +191,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     *time = accum;
 
-    printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+    AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
     // for (int i = 0; i < M; i++)
     // {
@@ -215,7 +215,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     struct timespec start, stop;
     int chunk_size = 0;
 
-    printf("Computing parallel product ...\n");
+    AUDIT printf("Computing parallel product ...\n");
     y = (double **)malloc(M * sizeof(double *));
     if (y == NULL)
     {
@@ -282,7 +282,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     *time = accum;
 
-    printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+    AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
     // for (int i = 0; i < M; i++)
     // {
