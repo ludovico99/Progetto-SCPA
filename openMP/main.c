@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 
     double **X = NULL;
 
-    int K[] = {3, 4, 8, 12, 16, 32, 64}; // It could be dynamic...
+    int K[] = {3, 4, 8, 12, 16, 32, 64};
 
     if (argc < 2)
     {

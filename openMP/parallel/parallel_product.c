@@ -61,7 +61,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
         // #pragma omp parallel for schedule(static, K/8) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, i) default(none)
         for (int z = 0; z < K; z++)
         {
-            if (irp_A[i] == -1)
+            if (i > 0 && irp_A[i] == irp_A[i - 1])
             {
                 AUDIT printf("Row %d is the vector zero\n", i);
                 y[i][z] = 0.0;

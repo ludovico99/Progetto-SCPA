@@ -146,36 +146,37 @@ int coo_to_ellpack_parallel(int rows, int columns, int nz, int *I, int *J, doubl
 
 void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
 {
-    int i, j, k;
-    int max_nz_per_row = 0;
-    int max_so_far = 0;
-    int *end = NULL;
-    int *curr = NULL;
-    int offset = 0;
-    int *occ;
-    int *sum_occ;
-
+    int * nz_per_row = NULL;
+    int nthread = omp_get_num_procs();
+    int chunk_size = 0;
 
     printf("Starting parallel CSR conversion ...\n");
-    fflush(stdout);
+    nz_per_row = (int *)calloc(M, sizeof(int));
 
-    occ = (int *)malloc(M * sizeof(int));
-    if (occ == NULL)
+    if (nz_per_row == NULL)
     {
-            printf("Errore malloc per occ\n");
-            exit(1);
+        printf("Errore malloc per nz_per_row\n");
+        exit(1);
     }
 
-    sum_occ = (int *)malloc(M * sizeof(int));
-    if (sum_occ == NULL)
+    printf("Counting number of non-zero entries in each row...\n");
+
+    if (nz % nthread == 0)
     {
-            printf("Errore malloc per sum_occ\n");
-            exit(1);
+        chunk_size = nz / nthread;
+    }
+    else
+        chunk_size = nz / nthread + 1;
+
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, I, nz, nz_per_row,stdout) default(none)
+
+    for (int i = 0; i < nz; i++)
+    {   
+#pragma omp atomic 
+        nz_per_row[I[i]] += 1;
     }
 
-    memset(occ, 0, sizeof(int) * M);
-    memset(sum_occ, 0, sizeof(int) * M);
-
+    printf("Allocating memory ...\n");
     // Alloca memoria per gli array CSR
     if (val != NULL)
     {
@@ -203,76 +204,40 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
 
     memset(*irp, -1, sizeof(int) * M);
 
-    for (int i = 0; i < nz; i++)
-    {
-        occ[I[i]]++;
-        // printf("%d\n", occ[I[i]]);
-    }
-    int sum = 0;
-    for (int i = 0; i < M; i++)
-    {
-        sum += occ[i];
-    }
-
-    for (int i = 0; i < M; i++)
-    {
-        if (i == 0)
-            sum_occ[i] = occ[0];
-        else
-            sum_occ[i] = sum_occ[i - 1] + occ[i];
-    }
-
     printf("Filling CSR data structure ... \n");
     // Riempie gli array CSR
-    offset = 0;
-    int nthread = omp_get_num_procs();
-    int chunk_size = 0;
 
-    if (M % nthread == 0)
-    {
-        chunk_size = M / nthread;
-    }
-    else
-        chunk_size = M / nthread + 1;
-
-    int not_empty = 0;
-    int num_first_nz_current_row;
-    int my_offset;
-
-#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, M, nz, ja, as, irp, val, I, J, sum_occ) private(my_offset, not_empty, num_first_nz_current_row) default(none)
-
-    for (int i = 0; i < M; i++)
-    {
-        not_empty = 0;
-        num_first_nz_current_row;
-
-        if (i == 0)
-        {
-            num_first_nz_current_row = 0;
-        }
-        else
-            num_first_nz_current_row = sum_occ[i - 1];
-
-        (*irp)[i] = num_first_nz_current_row;
-        my_offset = num_first_nz_current_row;
-
-        for (int j = 0; j < nz; j++)
-        {
-            if (I[j] == i)
-            {
-                if (val != NULL)
-                    (*as)[my_offset] = val[j];
-                (*ja)[my_offset] = J[j];
-                my_offset++;
-                not_empty = 1;
-            }
-        }
-        if (!not_empty)
-            (*irp)[i] = -1;
+    (*irp)[0] = 0;
+    for (int i = 0; i < M - 1; i++)
+    {    
+        (*irp)[i + 1] = (*irp)[i] + nz_per_row[i];
     }
 
-    free(occ);
-    free(sum_occ);
+    free(nz_per_row);
+
+    int offset = 0;
+    int row;
+    int idx;
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, nz, irp, ja, as, val, offset, I, J) private(row, idx) default(none)
+
+    for (int i = 0; i < nz; i++)
+    {   
+        row = I[i];
+        idx = (*irp)[row];
+        
+        (*ja)[idx] = J[i];
+        if (val != NULL)(*as)[idx] = val[i];
+        
+        #pragma omp atomic
+            (*irp)[row]++;
+    }
+    
+
+     // Reset row pointers
+    for (int i = M - 1; i > 0; i--) {
+        (*irp)[i] = (*irp)[i-1];
+    }
+    (*irp)[0] = 0;
 
     printf("Completed parallel CSR conversion ...\n");
 }
@@ -368,8 +333,7 @@ int *coo_to_ellpack_no_zero_padding_parallel(int rows, int columns, int nz, int 
 
     printf("Malloc for ELLPACK data structures completed\n");
     fflush(stdout);
-    // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
-    //int counter = 0;
+
 #pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, rows, values, col_indices, I, val, J, nz, nz_per_row) num_threads(nthreads) private(offset) default(none)
     for (int i = 0; i < rows; i++)
     {
@@ -393,9 +357,6 @@ int *coo_to_ellpack_no_zero_padding_parallel(int rows, int columns, int nz, int 
             printf("offset maggiore di nz_per_row");
             exit(1);
         }
-// #pragma omp atomic
-//         counter++;
-//         printf("%d rows completed\n", counter);
     }
 
     printf("ELLPACK parallel completed...\n");

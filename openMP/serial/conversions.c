@@ -167,7 +167,6 @@ void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *va
     if (offset != nz)
     {
         printf("Error during CSR conversion has occured\n");
-        printf("%d-%d", offset, nz);
         exit(0);
     }
 
