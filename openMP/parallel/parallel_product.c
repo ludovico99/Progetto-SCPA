@@ -68,12 +68,12 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
             }
             else
             {
-                AUDIT printf("Computing y[%d][%d]\n", i, z);
+                //printf("Computing y[%d][%d]\n", i, z);
 
-                if (i < (M - 1))
-                    AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
-                else
-                    AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
+                // if (i < (M - 1))
+                //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
+                // else
+                //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
 
                 for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
                 {
@@ -92,7 +92,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     }
     AUDIT printf("Completed parallel product ...\n");
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
@@ -160,7 +160,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
 
         for (int z = 0; z < K; z++)
         {
-            AUDIT printf("Computing y[%d][%d]\n", i, z);
+            //printf("Computing y[%d][%d]\n", i, z);
 
             for (int j = 0; j < max_nz_per_row; j++)
             {      
@@ -189,7 +189,7 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     AUDIT printf("Completed parallel product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 
@@ -280,7 +280,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     }
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
 

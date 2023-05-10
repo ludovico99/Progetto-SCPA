@@ -79,7 +79,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL)  *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 
@@ -167,7 +167,7 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
     AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 
@@ -267,7 +267,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per
 
         for (int z = 0; z < K; z++)
         {
-            AUDIT printf("Computing y[%d][%d]\n", i, z);
+            //AUDIT printf("Computing y[%d][%d]\n", i, z);
             if (nz_per_row[i] == 0) {
                 y[i][z] = 0.0;
                 continue;
@@ -290,7 +290,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per
     }
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
-    *time = accum;
+    if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
 

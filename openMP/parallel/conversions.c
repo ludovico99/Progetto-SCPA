@@ -152,14 +152,30 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
     int *end = NULL;
     int *curr = NULL;
     int offset = 0;
+    int *occ;
+    int *sum_occ;
 
-    int occ[M];
-    int sum_occ[M];
+
+    printf("Starting parallel CSR conversion ...\n");
+    fflush(stdout);
+
+    occ = (int *)malloc(M * sizeof(int));
+    if (occ == NULL)
+    {
+            printf("Errore malloc per occ\n");
+            exit(1);
+    }
+
+    sum_occ = (int *)malloc(M * sizeof(int));
+    if (sum_occ == NULL)
+    {
+            printf("Errore malloc per sum_occ\n");
+            exit(1);
+    }
 
     memset(occ, 0, sizeof(int) * M);
     memset(sum_occ, 0, sizeof(int) * M);
 
-    printf("Starting parallel CSR conversion ...\n");
     // Alloca memoria per gli array CSR
     if (val != NULL)
     {
@@ -185,9 +201,7 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
         exit(1);
     }
 
-    printf("Before memset ...\n");
     memset(*irp, -1, sizeof(int) * M);
-    printf("After memset ... \n");
 
     for (int i = 0; i < nz; i++)
     {
@@ -256,6 +270,9 @@ void coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
         if (!not_empty)
             (*irp)[i] = -1;
     }
+
+    free(occ);
+    free(sum_occ);
 
     printf("Completed parallel CSR conversion ...\n");
 }

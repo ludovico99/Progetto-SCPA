@@ -1,22 +1,26 @@
+all_CSR:
+	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCORRECTNESS -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-serial-CSR:
+all_ELLPACK:
+	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCORRECTNESS -DELLPACK -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
+
+serial-CSR_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-parallel-CSR:
+parallel-CSR_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DPARALLEL_SAMPLING -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-both-CSR:
+both-CSR_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DBOTH -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-serial-ELLPACK:
+serial-ELLPACK_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-parallel-ELLPACK:
+parallel-ELLPACK_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DELLPACK -DPARALLEL_SAMPLING -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-both-ELLPACK:
+both-ELLPACK_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DBOTH -DELLPACK -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
-
 
 matrice_prova:
 	./openMP ../Matrici/prova.mtx 
@@ -45,6 +49,9 @@ amazon0302:
 Cube_Coup_dt0:
 	./openMP ../Matrici/Cube_Coup_dt0/Cube_Coup_dt0.mtx 
 
+ML_Laplace:
+	./openMP ../Matrici/ML_Laplace/ML_Laplace.mtx 
+	
 max_nz_by_row:
 	cat ../Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1813 " | wc -l
 
