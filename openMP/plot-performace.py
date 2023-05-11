@@ -63,8 +63,8 @@ samplings_64_parallel  = [[],[],[]]
 
 
 # Leggo le misure delle prestazioni per il parallelo
-df_parallel = pandas.read_csv("samplings_parallel_ELLPACK.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
-#df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
+#df_parallel = pandas.read_csv("samplings_parallel_ELLPACK.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
+df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
 
 for row in df_parallel.itertuples(index= False):
 
@@ -104,8 +104,8 @@ for row in df_parallel.itertuples(index= False):
 		exit(1)
 
 # Leggo le misure delle prestazioni per il seriale
-df_serial = pandas.read_csv("samplings_serial_ELLPACK.csv", dtype={'K': 'int64','mean': 'float64', 'variance': 'float64'})
-#df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
+#df_serial = pandas.read_csv("samplings_serial_ELLPACK.csv", dtype={'K': 'int64','mean': 'float64', 'variance': 'float64'})
+df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
 
 samplings_3_serial = []
 samplings_4_serial  = []

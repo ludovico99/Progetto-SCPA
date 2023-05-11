@@ -1,8 +1,14 @@
-all_CSR:
+check_CSR_correctness:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCORRECTNESS -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
-all_ELLPACK:
+check_ELLPACK_correctness:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCORRECTNESS -DELLPACK -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
+
+check_CSR_conversion:
+	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCHECK_CONVERSION -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
+
+check_ELLPACK_conversion:
+	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -DCHECK_CONVERSION -DELLPACK -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP
 
 serial-CSR_samping:
 	gcc -fopenmp -std=c99 -D_POSIX_SOURCE -D_GNU_SOURCE serial/serial_product.c serial/conversions.c parallel/conversions.c parallel/parallel_product.c mmio.c main.c -o openMP

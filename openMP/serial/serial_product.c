@@ -49,7 +49,11 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     {
 
         for (int z = 0; z < K; z++)
-        {
+        {   
+            if (i == 0 && irp_A[i] == -1){
+                AUDIT printf("Row 0 is the vector zero\n");
+                y[i][z] = 0.0;
+            }
             if (i > 0 && irp_A[i] == irp_A[i - 1])
             {
                 AUDIT printf("Row %d is the vector zero\n", i);
@@ -97,7 +101,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     //     }
     // }
 
-    AUDIT printf("\n");
+    // AUDIT printf("\n");
     return y;
 }
 

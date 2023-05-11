@@ -336,13 +336,102 @@ int main(int argc, char *argv[])
     }
 
 #ifdef ELLPACK
+#ifdef CHECK_CONVERSION
+    double **values_B = NULL;
+    int **col_indices_B = NULL;
+
+    coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values_B, &col_indices_B);
+    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices);
+
+    for (int i = 0; i < M; i++)
+    {
+        for (int j = 0; j < nz_per_row[i]; j++)
+        {
+            int found = 0;
+            for (int k = 0; k < nz_per_row[i]; k++)
+            {
+                if (col_indices[i][j] == col_indices_B[i][k])
+                {
+                    found++;
+                    if (found > 1)
+                    {
+                        printf("The two conversions are different\n");
+                        exit(1);
+                    }
+                    if (values[i][j] != values_B[i][k])
+                    {
+                        printf("The two conversions are different\n");
+                        exit(1);
+                    }
+                }
+            }
+            if (found == 0)
+            {
+                printf("The two conversions are different\n");
+                exit(1);
+            }
+        }
+    }
+
+    printf("Same ELLPACK conversions\n");
+    if (f != stdin)
+        fclose(f);
+    return 0;
+#else
     // int max_nz_per_row  = coo_to_ellpack_serial(M, N, nz, I, J, val, &values, &col_indices);
     // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
     int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    // int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices);
+#endif
 
 #else
+
+#ifdef CHECK_CONVERSION
+    double *as_B = NULL;
+    int *ja_B = NULL;
+    int *irp_B = NULL;
+
+    coo_to_CSR_parallel(M, N, nz, I, J, val, &as_B, &ja_B, &irp_B);
+    coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+
+    for (int i = 0; i < M; i++){
+        for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++){
+            int found = 0;
+            for (int k = irp_B[i]; (i < (M - 1) && k < irp_B[i + 1]) || (i >= M - 1 && k < nz); k++){
+                 if (ja_A[j] == ja_B[k])
+                {
+                    found++;
+                    if (found > 1)
+                    {
+                        printf("The two conversions are different\n");
+                        exit(1);
+                    }
+                    if (as_A[j] != as_B[k])
+                    {
+                        printf("The two conversions are different\n");
+                        exit(1);
+                    }
+                }
+            }
+            if (found == 0)
+            {
+                printf("The two conversions are different\n");
+                exit(1);
+            }
+        }
+           
+    }
+
+    printf("Same CSR conversions\n");
+    if (f != stdin)
+        fclose(f);
+    return 0;
+#else
+    // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
     // coo_to_CSR_serial(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+    coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
+#endif
+
 #endif
 
 #ifndef CORRECTNESS
@@ -405,18 +494,17 @@ int main(int argc, char *argv[])
     create_dense_matrix(N, k, &X);
 #ifdef ELLPACK
 
-     y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
+    y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
     // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, NULL);
 
-    y_parallel = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL , nthread);
+    y_parallel = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
     // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, NULL, num_thread)
-   
+
 #else
 
     y_serial = serial_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL);
 
     y_parallel = parallel_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL, nthread);
-
 
 #endif
 

@@ -48,19 +48,24 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
         exit(EXIT_FAILURE);
     }
 
-    if (nz % nthread == 0)
+    if (M % nthread == 0)
     {
-        chunk_size = nz / nthread;
+        chunk_size = M / nthread;
     }
     else
-        chunk_size = nz / nthread + 1;
+        chunk_size = M / nthread + 1;
+
 
 #pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
     {
         // #pragma omp parallel for schedule(static, K/8) num_threads(nthread) shared(y, as_A, X, ja_A, irp_A, M, K, nz, i) default(none)
         for (int z = 0; z < K; z++)
-        {
+        {   
+            if (i == 0 && irp_A[i] == -1){
+                AUDIT printf("Row 0 is the vector zero\n");
+                y[i][z] = 0.0;
+            }
             if (i > 0 && irp_A[i] == irp_A[i - 1])
             {
                 AUDIT printf("Row %d is the vector zero\n", i);

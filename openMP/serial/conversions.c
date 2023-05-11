@@ -105,16 +105,28 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
     return max_nz_per_row;
 }
 
-void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
+void coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
 {
-    int i, j, k;
-    int max_nz_per_row = 0;
-    int max_so_far = 0;
-    int *end = NULL;
-    int *curr = NULL;
-    int offset = 0;
+    int * nz_per_row = NULL;
+    int chunk_size = 0;
 
-    printf("Starting CSR conversion ...\n");
+    printf("Starting serial CSR conversion ...\n");
+    nz_per_row = (int *)calloc(M, sizeof(int));
+
+    if (nz_per_row == NULL)
+    {
+        printf("Errore malloc per nz_per_row\n");
+        exit(1);
+    }
+
+    printf("Counting number of non-zero entries in each row...\n");
+
+    for (int i = 0; i < nz; i++)
+    {   
+        nz_per_row[I[i]]++;
+    }
+
+    printf("Allocating memory ...\n");
     // Alloca memoria per gli array CSR
     if (val != NULL)
     {
@@ -125,6 +137,7 @@ void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *va
             exit(1);
         }
     }
+
     *ja = (int *)malloc(nz * sizeof(int));
     if (*ja == NULL)
     {
@@ -132,43 +145,60 @@ void coo_to_CSR_serial(int rows, int columns, int nz, int *I, int *J, double *va
         exit(1);
     }
 
-    *irp = (int *)malloc(rows * sizeof(int));
+    *irp = (int *)malloc(M * sizeof(int));
     if (*irp == NULL)
     {
         printf("Errore malloc per ja\n");
         exit(1);
     }
 
-    printf("Before memset ...\n");
-    memset(*irp, -1, sizeof(int) * rows);
-    printf("After memset ... \n");
+    memset(*irp, -1, sizeof(int) * M);
+
+    printf("Filling CSR data structure ... \n");
     // Riempie gli array CSR
-    offset = 0;
-    int not_empty = 0;
-    for (int i = 0; i < rows; i++)
-    {
-        (*irp)[i] = offset;
-        not_empty = 0;
-        for (int j = 0; j < nz; j++)
-        {
-            if (I[j] == i)
-            {
-                if (val != NULL)
-                    (*as)[offset] = val[j];
-                (*ja)[offset] = J[j];
-                offset++;
-                not_empty = 1;
-            }
-        }
-        if (!not_empty)
-            (*irp)[i] = -1;
+
+    if (nz_per_row[0] == 0) {
+        (*irp)[0] = -1;
+        (*irp)[1] = 0;
+    }
+    else  {
+        (*irp)[0] = 0;
+        (*irp)[1] = (*irp)[0] + nz_per_row[0]; 
+    }
+    for (int i = 1; i < M - 1; i++)
+    {    
+        (*irp)[i + 1] = (*irp)[i] + nz_per_row[i];
     }
 
-    if (offset != nz)
-    {
-        printf("Error during CSR conversion has occured\n");
-        exit(0);
-    }
+    int offset = 0;
+    int row;
+    int idx;
 
-    printf("Completed CSR conversion ...\n");
+    for (int i = 0; i < nz; i++)
+    {   
+        row = I[i];
+        idx = (*irp)[row];
+        
+        (*ja)[idx] = J[i];
+        if (val != NULL)(*as)[idx] = val[i];
+        
+        (*irp)[row]++;
+    }
+    
+
+     // Reset row pointers
+    for (int i = M - 1; i > 0; i--) {
+        (*irp)[i] = (*irp)[i-1];
+    }
+    
+    if (nz_per_row[0] == 0) {
+        (*irp)[0] = -1;
+        (*irp)[1] = 0;
+    }
+    else 
+        (*irp)[0] = 0;
+    
+    free(nz_per_row);
+
+    printf("Completed serial CSR conversion ...\n");
 }
