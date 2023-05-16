@@ -1,0 +1,171 @@
+module mykernel
+   use cudafor
+   contains
+   attributes(global) subroutine arrayFunc (d_idata, d_jdata, d_odata, nsize)
+     implicit none
+     integer, intent(in), value :: nsize
+     real(kind=4), intent (in),  dimension(*) :: d_idata, d_jdata
+     real(kind=4), intent (out), dimension(*) :: d_odata
+   
+     integer :: tid
+     tid = blockDim%x * (blockIdx%x-1) + threadIdx%x
+     if (tid <= nsize) then
+        d_odata(tid) = d_idata(tid) * __expf(d_jdata(tid)) 
+     end if
+   end subroutine
+end module
+
+program exe6
+  use mykernel
+  use cudafor
+  implicit none
+  integer :: error_code
+  integer :: nsize
+
+  real(kind=4), device, allocatable, dimension(:) :: d_a, d_b, d_c
+  real(kind=4), pinned, allocatable, dimension(:) :: h_a, h_b, h_c
+
+  integer,parameter :: nthreads = 256
+  integer :: nblocks
+
+  type(cudaevent) :: event_start, event_end
+  real(kind=4) :: event_etime
+
+  real(kind=4), allocatable, dimension(:) :: cpu_result
+  real(kind=4) :: event_etime_cpu
+
+  integer,parameter :: chunk_size_max = 65536
+  integer,parameter :: num_streams = 8
+  integer :: i
+  integer :: num_chunk
+  integer :: h_offset, d_offset
+  integer :: chunk_size, chunk_stream
+
+  integer :: streams(num_streams)
+
+  nsize = 2097152 
+
+  !! chunk number calculation
+  num_chunk = (nsize-1) / chunk_size_max +1 
+
+  WRITE (*,*) 'size           = ', nsize
+  WRITE (*,*) 'chunk_size_max = ', chunk_size_max
+  WRITE (*,*) 'num_chunk      = ', num_chunk
+  
+  !! allocation and initialization of host buffers
+  allocate(h_a(nsize), h_b(nsize), h_c(nsize))
+
+  call random_number(h_a)
+  call random_number(h_b)
+
+!!-- insert CUDAFOR code -------------
+  !! buffers allocation on device
+  allocate(d_a(num_streams*chunk_size_max))
+  allocate(d_b(num_streams*chunk_size_max))
+  allocate(d_c(num_streams*chunk_size_max))
+
+  !! streams creation
+  do i = 1, num_streams
+     error_code = cudaStreamCreate(streams(i))
+  end do
+!!------------------------------------
+
+  !! create cuda events: event_start, event_end
+  error_code = cudaEventCreate(event_start)
+  error_code = cudaEventCreate(event_end)
+
+  print *, "GPU execution"
+
+  error_code = cudaEventRecord(event_start, 0)
+
+  do i = 1, num_chunk
+
+     ! please see get_chunk_info subroutine description
+     call get_chunk_info(i, d_offset, chunk_size, h_offset, chunk_stream, nsize, chunk_size_max, num_chunk, num_streams)
+
+!!-- insert CUDAFOR code -------------
+     !! host to device buffers copies
+     error_code = cudaMemcpyAsync(d_a(d_offset), h_a(h_offset), chunk_size, streams(chunk_stream))
+     error_code = cudaMemcpyAsync(d_b(d_offset), h_b(h_offset), chunk_size, streams(chunk_stream))
+!!------------------------------------
+
+     !! block number calculation
+     nBlocks = (chunk_size-1) / nThreads + 1
+
+!!-- insert CUDAFOR code -------------
+     !! arrayFunc kernel launch
+     call arrayFunc<<<nblocks, nthreads, 0, streams(chunk_stream)>>>(d_a(d_offset), d_b(d_offset), d_c(d_offset), chunk_size)
+!!------------------------------------
+
+!!-- insert CUDAFOR code -------------
+     !! copy back results from device
+     error_code = cudaMemcpyAsync(h_c(h_offset), d_c(d_offset), chunk_size, streams(chunk_stream))
+!!------------------------------------
+
+   end do
+
+   error_code = cudaDeviceSynchronize()
+
+   error_code = cudaEventRecord(event_end, 0)
+   error_code = cudaEventSynchronize(event_end)
+   error_code = cudaEventElapsedTime(event_etime, event_start, event_end)
+
+   print *, "Elapsed time on GPU: ", event_etime, " ms"
+
+   !! CPU execution
+   print *, "CPU execution"
+   allocate(cpu_result(nsize))
+   error_code = cudaEventRecord(event_start, 0)
+   call arrayFuncCPU (h_a, h_b, cpu_result, nsize)
+   error_code = cudaEventRecord(event_end, 0)
+   error_code = cudaEventSynchronize(event_end)
+   error_code = cudaEventElapsedTime(event_etime_cpu, event_start, event_end)
+
+   print *, "Elapsed time on CPU: ", event_etime_cpu, " ms"
+   print "(1x,a,F5.1,a)", "Speed UP CPU/GPU ", event_etime_cpu/event_etime, "x"
+
+   print *, "Check results:"
+   print *, "h_c(1)        = ", h_c(1)
+   print *, "cpu_result(1) = ", cpu_result(1)
+
+   !! free resources on device
+   error_code = cudaEventDestroy(event_start)
+   error_code = cudaEventDestroy(event_end)
+   deallocate (d_a, d_b, d_c)
+   do i = 1, num_streams
+      error_code = cudaStreamDestroy(streams(i))
+   end do
+
+   !! free resources on host
+   deallocate (h_a, h_b, h_c)
+
+end program exe6
+
+subroutine arrayFuncCPU (h_idata, h_jdata, h_odata, nsize)
+implicit none
+integer, intent(in) :: nsize
+real(kind=4), dimension(nsize), intent(in)  :: h_idata, h_jdata
+real(kind=4), dimension(nsize), intent(out) :: h_odata
+   h_odata = h_idata * EXP(h_jdata)
+end subroutine arrayFuncCPU
+
+! get_chunk_info is used to compute some useful information starting
+!   from the i-th chunk, the total number of used chunks, 
+!   the maximum chunk size and the array size to process
+! get_chunk_info returns:
+! * chunk_size: the number of elements to use in current chunk
+! * chunk_stream: the stream to use to process i-th chunk
+! * the offsets to use for accessing the correct elements of host 
+!   and device arrays in data movements and kernel launch
+!
+subroutine get_chunk_info (i, d_offset, chunk_size, h_offset, chunk_stream, nsize, chunk_size_max, num_chunk, num_streams)
+   implicit none
+   integer :: i, d_offset, chunk_size, h_offset, chunk_stream, nsize, chunk_size_max, num_chunk, num_streams
+   integer :: reminder
+   reminder = mod(nsize, chunk_size_max)
+   h_offset = (i-1) * chunk_size_max +1
+   chunk_stream = mod(i-1, num_streams) +1
+   chunk_size = chunk_size_max
+   d_offset = (chunk_stream-1) * chunk_size_max +1
+   if (reminder /= 0 .and. i == num_chunk) chunk_size = reminder
+end subroutine get_chunk_info

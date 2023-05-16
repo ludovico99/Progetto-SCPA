@@ -1,0 +1,117 @@
+module mykernel
+   use cudafor
+   contains
+   attributes(global) subroutine arrayFunc (d_idata, d_jdata, d_odata, nsize)
+     implicit none
+     integer, intent(in), value :: nsize
+     real(kind=4), intent (in),  dimension(nsize) :: d_idata, d_jdata
+     real(kind=4), intent (out), dimension(nsize) :: d_odata
+   
+     integer :: tid
+     tid = blockDim%x * (blockIdx%x-1) + threadIdx%x
+     if (tid <= nsize) then
+        d_odata(tid) = d_idata(tid) * __expf(d_jdata(tid)) 
+     end if
+   end subroutine
+end module
+
+program exe5
+  use mykernel
+  use cudafor
+  implicit none
+  integer :: error_code
+  integer :: nsize
+
+  real(kind=4), device, allocatable, dimension(:) :: d_a, d_b, d_c
+  real(kind=4), pinned, allocatable, dimension(:) :: h_a, h_b, h_c
+
+  integer :: nthreads = 256
+  integer :: nblocks
+
+  type(cudaevent) :: event_start, event_end
+  real(kind=4) :: event_etime
+
+  real(kind=4), allocatable, dimension(:) :: cpu_result
+  real(kind=4) :: event_etime_cpu
+
+  nsize = 2097152 
+  
+  !! block number calculation
+  nblocks = (nsize-1) / nthreads + 1
+  print *, "Numero di elementi: ", nsize
+  print "(1x,a,i5,a,i5)", "Calcolo su GPU usando ", nblocks , " blocchi ciascuno di ", nthreads, " threads"
+
+  !! allocation and initialization of host buffers
+  allocate(h_a(nsize), h_b(nsize), h_c(nsize))
+
+  call random_number(h_a)
+  call random_number(h_b)
+
+!!-- insert CUDAFOR code -------------
+  !! buffers allocation on device
+  allocate(d_a(nsize), d_b(nsize), d_c(nsize))
+!!------------------------------------
+
+  !! create cuda events: event_start, event_end
+  error_code = cudaEventCreate(event_start)
+  error_code = cudaEventCreate(event_end)
+
+  print *, "GPU execution"
+
+  error_code = cudaEventRecord(event_start, 0)
+
+!!-- insert CUDAFOR code -------------
+  !! host to device buffers copies
+  d_a = h_a
+  d_b = h_b
+!!------------------------------------
+
+!!-- insert CUDAFOR code -------------
+  !! arrayFunc kernel launch
+  call arrayFunc<<<nblocks, nthreads>>>(d_a, d_b, d_c, nsize)
+!!------------------------------------
+
+!!-- insert CUDAFOR code -------------
+  !! copy back results from device
+  h_c = d_c
+!!------------------------------------
+
+  error_code = cudaEventRecord(event_end, 0)
+  error_code = cudaEventSynchronize(event_end)
+  error_code = cudaEventElapsedTime(event_etime, event_start, event_end)
+
+  print *, "Elapsed time on GPU: ", event_etime, " ms"
+
+  !! CPU execution
+  print *, "CPU execution"
+  allocate(cpu_result(nsize))
+  error_code = cudaEventRecord(event_start, 0)
+  call arrayFuncCPU (h_a, h_b, cpu_result, nsize)
+  error_code = cudaEventRecord(event_end, 0)
+  error_code = cudaEventSynchronize(event_end)
+  error_code = cudaEventElapsedTime(event_etime_cpu, event_start, event_end)
+
+  print *, "Elapsed time on CPU: ", event_etime_cpu, " ms"
+  print "(1x,a,F5.1,a)", "Speed UP CPU/GPU ", event_etime_cpu/event_etime, "x"
+
+  print *, "Check results:"
+  print *, "h_c(1)        = ", h_c(1)
+  print *, "cpu_result(1) = ", cpu_result(1)
+
+  !! free resources on device
+  error_code = cudaEventDestroy(event_start)
+  error_code = cudaEventDestroy(event_end)
+  deallocate (d_a, d_b, d_c)
+
+  !! free resources on host
+  deallocate (h_a, h_b, h_c)
+
+end program exe5
+
+subroutine arrayFuncCPU (h_idata, h_jdata, h_odata, nsize)
+implicit none
+integer, intent(in) :: nsize
+real(kind=4), dimension(nsize), intent(in)  :: h_idata, h_jdata
+real(kind=4), dimension(nsize), intent(out) :: h_odata
+   h_odata = h_idata * EXP(h_jdata)
+end subroutine arrayFuncCPU
