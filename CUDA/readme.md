@@ -1,1 +1,0 @@
-In CUDA, possiamo utilizzare il parallelismo a thread e il modello di programmazione SIMD (Single Instruction, Multiple Data) per accelerare il calcolo del prodotto matrice-vettore. Possiamo utilizzare un kernel CUDA per eseguire il prodotto matrice-vettore su ogni riga della matrice A e utilizzare i thread all'interno di ogni blocco CUDA per sommare i risultati parziali.

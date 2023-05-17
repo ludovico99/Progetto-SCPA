@@ -8,10 +8,25 @@
 #include <time.h>
 #include <math.h>
 
+#include <cuda_runtime.h> // For CUDA runtime API
+#include <helper_cuda.h>  // For checkCudaError macro
+#include <helper_timer.h> // For CUDA SDK timers
+
 #include "mmio.h"
 #include "header.h"
 
 #define SAMPLING_SIZE 30
+
+__global__ void vectorAdd(const float *A, const float *B, float *C,
+                          int numElements)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (i < numElements)
+    {
+        C[i] = A[i] + B[i] + 0.0f;
+    }
+}
 
 static void create_dense_matrix(int N, int K, double ***x)
 {
@@ -394,11 +409,14 @@ int main(int argc, char *argv[])
     coo_to_CSR_parallel(M, N, nz, I, J, val, &as_B, &ja_B, &irp_B);
     coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
 
-    for (int i = 0; i < M; i++){
-        for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++){
+    for (int i = 0; i < M; i++)
+    {
+        for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
+        {
             int found = 0;
-            for (int k = irp_B[i]; (i < (M - 1) && k < irp_B[i + 1]) || (i >= M - 1 && k < nz); k++){
-                 if (ja_A[j] == ja_B[k])
+            for (int k = irp_B[i]; (i < (M - 1) && k < irp_B[i + 1]) || (i >= M - 1 && k < nz); k++)
+            {
+                if (ja_A[j] == ja_B[k])
                 {
                     found++;
                     if (found > 1)
@@ -419,7 +437,6 @@ int main(int argc, char *argv[])
                 exit(1);
             }
         }
-           
     }
 
     printf("Same CSR conversions\n");
@@ -434,221 +451,187 @@ int main(int argc, char *argv[])
 
 #endif
 
-#ifndef CORRECTNESS
-    double mean = 0.0;
-    double time = 0.0;
-    double variance = 0.0;
-    const char *filename;
-#endif
-
-#ifdef BOTH
-
-    FILE *f_samplings_serial;
-    FILE *f_samplings_parallel;
-#ifdef ELLPACK
-    filename = "samplings_parallel_ELLPACK.csv";
-    f_samplings_parallel = fopen(filename, "w+");
-    fprintf(f_samplings_parallel, "K,num_threads,mean,variance\n");
-
-    filename = "samplings_serial_ELLPACK.csv";
-    f_samplings_serial = fopen(filename, "w+");
-    fprintf(f_samplings_serial, "K,mean,variance\n");
-#else
-    filename = "samplings_parallel_CSR.csv";
-    f_samplings_parallel = fopen(filename, "w+");
-    fprintf(f_samplings_parallel, "K,num_threads,mean,variance\n");
-
-    filename = "samplings_serial_CSR.csv";
-    f_samplings_serial = fopen(filename, "w+");
-    fprintf(f_samplings_serial, "K,mean,variance\n");
-#endif
-#elif CORRECTNESS
-#else
-
-    FILE *f_samplings;
-#ifdef PARALLEL_SAMPLING
-#ifdef ELLPACK
-    filename = "samplings_parallel_ELLPACK.csv";
-    f_samplings = fopen(filename, "w+");
-    fprintf(f_samplings, "K,num_threads,mean,variance\n");
-#else
-    filename = "samplings_parallel_CSR.csv";
-    f_samplings = fopen(filename, "w+");
-    fprintf(f_samplings, "K,num_threads,mean,variance\n");
-#endif
-#else
-#ifdef ELLPACK
-    filename = "samplings_serial_ELLPACK.csv";
-    f_samplings = fopen(filename, "w+");
-    fprintf(f_samplings, "K,mean,variance\n");
-#else
-    filename = "samplings_serial_CSR.csv";
-    f_samplings = fopen(filename, "w+");
-    fprintf(f_samplings, "K,mean,variance\n");
-#endif
-#endif
-#endif
-
 #ifdef CORRECTNESS
     int k = 16;
     create_dense_matrix(N, k, &X);
 #ifdef ELLPACK
 
-    y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
-    // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, NULL);
+    // y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
 
-    y_parallel = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
-    // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, NULL, num_thread)
+    // y_parallel = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
 
 #else
 
-    y_serial = serial_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL);
+    // y_serial = serial_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL);
 
-    y_parallel = parallel_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL, nthread);
+    // y_parallel = parallel_product_CSR(M, N, k, nz, as_A, ja_A, irp_A, X, NULL, nthread);
 
 #endif
-
-#elif !defined(BOTH)
-    for (int k = 0; k < 7; k++)
-    {
-        create_dense_matrix(N, K[k], &X);
-#ifdef PARALLEL_SAMPLING
-        for (int num_thread = 1; num_thread <= nthread; num_thread++)
-        {
-#endif
-            mean = 0.0;
-            variance = 0.0;
-            for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
-            {
-#ifdef ELLPACK
-#ifdef PARALLEL_SAMPLING
-                y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
-                // y_parallel = parallel_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time, num_thread)
-#else
-                y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time);
-                // y_serial = serial_product_ellpack(M, N, K, max_nz_per_row, values, col_indices, X, &time);
-#endif
-
-#else
-#ifdef PARALLEL_SAMPLING
-            y_parallel = parallel_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time, num_thread);
-#else
-            y_serial = serial_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time);
-#endif
-#endif
-
-                mean = calculate_mean(time, mean, curr_samp + 1);
-                variance = calculate_variance(time, mean, variance, curr_samp + 1);
-            }
-
-#ifdef PARALLEL_SAMPLING
-            printf("MEAN for K %d, num_thread %d is %lf\n", K[k], num_thread, mean);
-            fprintf(f_samplings, "%d,%d,%lf,%.20lf\n", K[k], num_thread, mean, variance);
-            fflush(f_samplings);
-        }
-#else
-        printf("MEAN for K %d is %lf\n", K[k], mean);
-        fprintf(f_samplings, "%d,%lf,%.20lf\n", K[k], mean, variance);
-        fflush(f_samplings);
-#endif
-
-        for (int i = 0; i < N; i++)
-        {
-            free(X[i]);
-        }
-        if (X != NULL)
-            free(X);
-    }
-#else
-
-    for (int k = 0; k < 7; k++)
-    {
-        create_dense_matrix(N, K[k], &X);
-        for (int num_thread = 1; num_thread <= nthread; num_thread++)
-        {
-            mean = 0.0;
-            variance = 0.0;
-            for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
-            {
-#ifdef ELLPACK
-                y_parallel = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
-                // y_parallel = parallel_product_ellpack(M, N, K[k], max_nz_per_row, values, col_indices, X, &time, num_thread)
-#else
-                y_parallel = parallel_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time, num_thread);
-#endif
-
-                mean = calculate_mean(time, mean, curr_samp + 1);
-                variance = calculate_variance(time, mean, variance, curr_samp + 1);
-            }
-
-            printf("MEAN for K %d, num_thread %d is %lf\n", K[k], num_thread, mean);
-            fprintf(f_samplings_parallel, "%d,%d,%lf,%.20lf\n", K[k], num_thread, mean, variance);
-            fflush(f_samplings_parallel);
-        }
-
-        for (int i = 0; i < N; i++)
-        {
-            free(X[i]);
-        }
-        if (X != NULL)
-            free(X);
-    }
-
-    for (int k = 0; k < 7; k++)
-    {
-        create_dense_matrix(N, K[k], &X);
-
-        mean = 0.0;
-        variance = 0.0;
-        for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
-        {
-#ifdef ELLPACK
-            y_serial = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time);
-            // y_serial = serial_product_ellpack(M, N, K[k], max_nz_per_row, values, col_indices, X, &time);
-#else
-            y_serial = serial_product_CSR(M, N, K[k], nz, as_A, ja_A, irp_A, X, &time);
-#endif
-
-            mean = calculate_mean(time, mean, curr_samp + 1);
-            variance = calculate_variance(time, mean, variance, curr_samp + 1);
-        }
-
-        printf("MEAN for K %d is %lf\n", K[k], mean);
-        fprintf(f_samplings_serial, "%d,%lf,%.20lf\n", K[k], mean, variance);
-        fflush(f_samplings_serial);
-
-        for (int i = 0; i < N; i++)
-        {
-            free(X[i]);
-        }
-        if (X != NULL)
-            free(X);
-    }
-#endif
-
-#ifdef CORRECTNESS
-
-    for (int i = 0; i < M; i++)
-    {
-        for (int z = 0; z < k; z++)
-        {
-            if (y_serial[i][z] != y_parallel[i][z])
-            {
-                printf("Serial result is different ...");
-                exit(0);
-            }
-        }
-    }
-    printf("Same results...\n");
-
-#elif !defined(BOTH)
-    fclose(f_samplings);
-#else
-    fclose(f_samplings_serial);
-    fclose(f_samplings_parallel);
 #endif
 
     if (f != stdin)
         fclose(f);
+
+    // Error code to check return values for CUDA calls
+    cudaError_t err = cudaSuccess;
+
+    // Print the vector length to be used, and compute its size
+    int numElements = 50000;
+    size_t size = numElements * sizeof(float);
+    printf("[Vector addition of %d elements]\n", numElements);
+
+    // Allocate the host input vector A
+    float *h_A = (float *)malloc(size);
+
+    // Allocate the host input vector B
+    float *h_B = (float *)malloc(size);
+
+    // Allocate the host output vector C
+    float *h_C = (float *)malloc(size);
+
+    // Verify that allocations succeeded
+    if (h_A == NULL || h_B == NULL || h_C == NULL)
+    {
+        fprintf(stderr, "Failed to allocate host vectors!\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize the host input vectors
+    for (int i = 0; i < numElements; ++i)
+    {
+        h_A[i] = 1.0;
+        h_B[i] = 1.0;
+    }
+
+    // Allocate the device input vector A
+    float *d_A = NULL;
+    err = cudaMalloc((void **)&d_A, size);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to allocate device vector A (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Allocate the device input vector B
+    float *d_B = NULL;
+    err = cudaMalloc((void **)&d_B, size);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to allocate device vector B (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Allocate the device output vector C
+    float *d_C = NULL;
+    err = cudaMalloc((void **)&d_C, size);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to allocate device vector C (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the host input vectors A and B in host memory to the device input
+    // vectors in
+    // device memory
+    printf("Copy input data from the host memory to the CUDA device\n");
+    err = cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr,
+                "Failed to copy vector A from host to device (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr,
+                "Failed to copy vector B from host to device (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Launch the Vector Add CUDA Kernel
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
+           threadsPerBlock);
+    vectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, numElements);
+    err = cudaGetLastError();
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to launch vectorAdd kernel (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the device result vector in device memory to the host result vector
+    // in host memory.
+    printf("Copy output data from the CUDA device to the host memory\n");
+    err = cudaMemcpy(h_C, d_C, size, cudaMemcpyDeviceToHost);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr,
+                "Failed to copy vector C from device to host (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Verify that the result vector is correct
+    for (int i = 0; i < numElements; ++i)
+    {
+        if (fabs(h_A[i] + h_B[i] - h_C[i]) > 1e-5)
+        {
+            fprintf(stderr, "Result verification failed at element %d!\n", i);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    printf("Test PASSED\n");
+
+    // Free device global memory
+    err = cudaFree(d_A);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to free device vector A (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaFree(d_B);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to free device vector B (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaFree(d_C);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to free device vector C (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Free host memory
+    free(h_A);
+    free(h_B);
+    free(h_C);
+
     return 0;
 }
