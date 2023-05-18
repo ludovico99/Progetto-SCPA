@@ -2,7 +2,8 @@
     "files.associations": {
         "unistd.h": "c",
         "omp.h": "c",
-        "time.h": "c"
+        "time.h": "c",
+        "numeric": "cpp"
     },
     "cmake.sourceDirectory": "/home/ludovico99/Scrivania/Progetto-SCPA/CUDA",
     "C_Cpp.errorSquiggles": "disabled"

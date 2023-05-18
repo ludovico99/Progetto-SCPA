@@ -13,7 +13,6 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
 {
 
     double **y = NULL;
-    int offset = 0;
     int chunk_size;
 
     struct timespec start, stop;
@@ -119,7 +118,6 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
 {
 
     double **y = NULL;
-    int offset = 0;
     struct timespec start, stop;
     int chunk_size = 0;
 
@@ -216,7 +214,6 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
 {
 
     double **y = NULL;
-    int offset = 0;
     struct timespec start, stop;
     int chunk_size = 0;
 
