@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#include "../header.h"
+#include "header.h"
 
 double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X, double *time)
 {
