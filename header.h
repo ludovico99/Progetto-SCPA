@@ -34,9 +34,10 @@ extern int *coo_to_ellpack_no_zero_padding_parallel(int, int, int, int *, int *,
 extern int *coo_to_ellpack_no_zero_padding_parallel_optimization(int, int, int, int *, int *, double *, double ***, int ***);
 #endif
 
+extern double **serial_product_CSR(int, int, int, int, double *, int *, int *, double **, double *);
+
 #ifdef OPENMP
 // OPENMP CSR
-extern double **serial_product_CSR(int, int, int, int, double *, int *, int *, double **, double *);
 extern double **parallel_product_CSR(int , int , int , int , double *, int *, int *, double **,double * , int );
 // OPENMP ELLPACK
 extern double **serial_product_ellpack(int, int, int, int, double **, int **, double **, double *);
@@ -46,9 +47,10 @@ extern double **parallel_product_ellpack_no_zero_padding(int, int, int, int *, d
 #endif
 
 #ifdef CUDA
-extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
+extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **, double *);
 #endif
 
+extern double compute_GFLOPS (int k, int nz, double time);
 extern int compute_chunk_size(int , int);
 extern void coo_general(int , int *, int *, int *, int **, int **, double **, int );
 extern void coo_symm(int , int *, int *, int *, int **, int **, double **, int );

@@ -13,7 +13,6 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
 {
 
     double **y = NULL;
-    int offset = 0;
     struct timespec start, stop;
 
     AUDIT printf("Computing serial product ...\n");
@@ -109,7 +108,6 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
 {
 
     double **y = NULL;
-    int offset = 0;
     struct timespec start, stop;
 
     AUDIT printf("Computing serial product ...\n");
@@ -141,7 +139,6 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
         exit(EXIT_FAILURE);
     }
 
-    int last_column = 0;
     for (int i = 0; i < M; i++)
     {
 
@@ -240,7 +237,6 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int *nz_per
 {
 
     double **y = NULL;
-    int offset = 0;
     struct timespec start, stop;
 
     AUDIT printf("Computing serial product ...\n");
@@ -272,7 +268,6 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int *nz_per
         exit(EXIT_FAILURE);
     }
 
-    int last_column = 0;
     for (int i = 0; i < M; i++)
     {
 

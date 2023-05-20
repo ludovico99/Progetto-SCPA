@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
     int *J;
     double *val;
     double **y_serial;
+    double time; 
 
 #ifdef ELLPACK
     double **values;
@@ -299,7 +300,8 @@ int main(int argc, char *argv[])
 #endif // OPENMP
 
 #ifdef CUDA
-    y_parallel_cuda = CSR_GPU(M, N, k, nz, as, ja, irp, X);
+    y_parallel_cuda = CSR_GPU(M, N, k, nz, as, ja, irp, X, NULL);
+  
 #endif // CUDA
 
 #endif // CSR
