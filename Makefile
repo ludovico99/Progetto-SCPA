@@ -7,42 +7,49 @@ COMPILER_CUDA=-x cu
 
 NVCC=nvcc
 LINK=-lm
-DEFINES= -DCORRECTNESS -DCUDA -DCSR
 OPENMP=--compiler-options -fopenmp
 INCLUDES=-I${cudaPath}/samples/common/inc
 FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 LINK=-lm
+
+MODE = csr
+
+ifeq ($(MODE), csr)
+    DEFINES= -DCORRECTNESS -DCUDA -DCSR
+else
+    DEFINES= -DCORRECTNESS -DCUDA -DELLPACK
+endif
 
 all: build
 
 build: app
 
 main.o: main.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS) -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 mmio.o: mmio.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 conversions_parallel.o: conversions_parallel.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 conversions_serial.o: conversions_serial.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 parallel_product.o: ./CUDA/parallel_product.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 serial_product.o: serial_product.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 utils.o: utils.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 checks.o: checks.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 create_mtx_coo.o: create_mtx_coo.c
-	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 app: main.o mmio.o conversions_parallel.o parallel_product.o serial_product.o utils.o create_mtx_coo.o
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@

@@ -48,13 +48,13 @@ extern void free_ELLPACK_data_structures(int, double **, int **);
 #endif
 
 extern double **serial_product_CSR(int, int, int, int, double *, int *, int *, double **, double *);
+extern double **serial_product_ellpack(int, int, int, int, double **, int **, double **, double *);
+extern double **serial_product_ellpack_no_zero_padding(int, int, int, int *, double **, int **, double **, double *);
 
 #ifdef OPENMP
 // OPENMP CSR
 extern double **parallel_product_CSR(int, int, int, int, double *, int *, int *, double **, double *, int);
 // OPENMP ELLPACK
-extern double **serial_product_ellpack(int, int, int, int, double **, int **, double **, double *);
-extern double **serial_product_ellpack_no_zero_padding(int, int, int, int *, double **, int **, double **, double *);
 extern double **parallel_product_ellpack(int, int, int, int, double **, int **, double **, double *, int);
 extern double **parallel_product_ellpack_no_zero_padding(int, int, int, int *, double **, int **, double **, double *, int);
 
@@ -63,9 +63,16 @@ extern void free_X(int, double **);
 #endif
 
 #ifdef CUDA
+#ifdef CSR
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **, double *);
-// extern double *CSR_ELLPACK(int, int, int, int*, double **, int **, double **, double *);
+#elif ELLPACK
+extern double *ELLPACK_GPU(int, int, int, int, int *, double **, int **, double **, double *);
 #endif
+#endif
+
+extern double *convert_2D_to_1D (int, int, double **);
+extern double *convert_2D_to_1D_per_ragged_matrix (int ,int, int * , double ** );
+extern int *convert_2D_to_1D_per_ragged_matrix (int , int,  int * , int ** );
 
 extern double compute_GFLOPS(int k, int nz, double time);
 extern int compute_chunk_size(int, int);

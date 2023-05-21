@@ -296,14 +296,18 @@ int main(int argc, char *argv[])
     y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
 
     free_X(N, X);
-
+    free_ELLPACK_data_structures(M, values, col_indices);
+    
 #endif
 
 #ifdef CUDA
+
+    y_parallel_cuda = ELLPACK_GPU(M, N, k, nz, nz_per_row, values, col_indices, X, NULL);
+
 #endif
 
-    free_ELLPACK_data_structures(M, values, col_indices);
-
+    free (nz_per_row);
+    
 #endif // ELLPACK
 
 #ifdef CSR
