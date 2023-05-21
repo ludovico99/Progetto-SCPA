@@ -63,7 +63,7 @@ int check_matcode_error(MM_typecode matcode)
     return 0;
 }
 
-static void create_dense_matrix(int N, int K, double ***x)
+void create_dense_matrix(int N, int K, double ***x)
 {
 
     AUDIT printf("Creating dense matrix ...\n");
@@ -91,24 +91,6 @@ static void create_dense_matrix(int N, int K, double ***x)
     AUDIT printf("Completed dense matrix creation...\n");
 }
 
-static double calculate_mean(double x, double mean, int n)
-{
-    mean += (x - mean) / n;
-    return mean;
-}
-
-static double calculate_variance(double x, double mean, double variance, int n)
-{
-    if (n == 1)
-    {
-        return 0.0;
-    }
-    double delta = x - mean;
-    mean = calculate_mean(x, mean, n);
-    variance += delta * (x - mean);
-    return variance / (n - 1);
-}
-
 int main(int argc, char *argv[])
 {
     int nthread;
@@ -122,7 +104,6 @@ int main(int argc, char *argv[])
     int *J;
     double *val;
     double **y_serial;
-    double time; 
 
 #ifdef ELLPACK
     double **values;
@@ -146,7 +127,9 @@ int main(int argc, char *argv[])
     double **X;
     MM_typecode matcode;
 
+#ifdef SAMPLINGS
     int K[] = {3, 4, 8, 12, 16, 32, 64};
+#endif
 
     nthread = omp_get_num_procs();
 
@@ -278,6 +261,27 @@ int main(int argc, char *argv[])
 
 #endif // CSR
 
+#ifdef SAMPLINGS
+
+#ifdef OPENMP
+    #ifdef CSR
+        computing_samplings_openMP(M, N, K, nz, as, ja, irp, nthread);
+    #elif ELLPACK
+        computing_samplings_openMP(M, N, K, nz, nz_per_row, values, col_indices, nthread);
+    #endif
+#endif
+
+#ifdef CUDA
+    // TODO
+#endif // CUDA
+
+    if (f != stdin)
+    fclose(f);
+    return 0;
+    
+#endif // SAMPLINGS
+
+
 #ifdef CORRECTNESS
 
     int k = 64;
@@ -323,7 +327,6 @@ int main(int argc, char *argv[])
 
 #endif // CSR
 
-
     for (int i = 0; i < M; i++)
     {
         for (int z = 0; z < k; z++)
@@ -345,14 +348,13 @@ int main(int argc, char *argv[])
     printf("Same results...\n");
 
     printf("Freeing matrix y...\n");
-    free_y(M,y_serial);
-    #ifdef OPENMP
-    free_y(M,y_parallel_omp);
-    #endif
-    #ifdef CUDA
+    free_y(M, y_serial);
+#ifdef OPENMP
+    free_y(M, y_parallel_omp);
+#endif
+#ifdef CUDA
     free(y_parallel_cuda);
-    #endif
-   
+#endif
 
 #endif // CORRECTNESS
 

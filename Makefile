@@ -21,7 +21,7 @@ main.o: main.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS) -o $@ -c $<
 
 mmio.o: mmio.c
-	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
 
 conversions_parallel.o: conversions_parallel.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) -o $@ -c $<
@@ -33,16 +33,16 @@ parallel_product.o: ./CUDA/parallel_product.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 serial_product.o: serial_product.c
-	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 utils.o: utils.c
-	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 checks.o: checks.c
-	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 create_mtx_coo.o: create_mtx_coo.c
-	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 app: main.o mmio.o conversions_parallel.o parallel_product.o serial_product.o utils.o create_mtx_coo.o
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
@@ -73,6 +73,18 @@ openmp-csr-check-conversions:
 
 openmp-ellpack-check-conversions:
 	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c -o app
+
+openmp-csr-serial-samplings:
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+
+openmp-csr-parallel-samplings:
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+
+openmp-ellpack-serial-samplings:
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+
+openmp-ellpack-parallel-samplings:
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
 
 matrice_prova:
 	./app Matrici/prova.mtx 

@@ -259,7 +259,7 @@ double * CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_ir
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n",expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec*1e-3);
     
-    //if (time != NULL) *time = expireTimeMsec * 1e6;
+    if (time != NULL) *time = expireTimeMsec * 1e6;
     printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
 
     // Copy the device result vector in device memory to the host result vector
