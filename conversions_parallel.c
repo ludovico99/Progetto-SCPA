@@ -10,22 +10,19 @@
 
 #include "header.h"
 
-int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
+int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices, int nthread)
 {
     int max_nz_per_row = 0;
     int max_so_far = 0;
-    int nthreads;
     int nz_in_row;
     int offset;
     int chunk_size;
 
-    nthreads = omp_get_num_procs();
-
     printf("ELLPACK parallel started...\n");
 
-    chunk_size = compute_chunk_size(M, nthreads);
+    chunk_size = compute_chunk_size(M, nthread);
 
-#pragma omp parallel shared(I, J, val, max_so_far, M, nz, chunk_size) firstprivate(max_nz_per_row) private(nz_in_row) num_threads(nthreads) default(none)
+#pragma omp parallel shared(I, J, val, max_so_far, M, nz, chunk_size) firstprivate(max_nz_per_row) private(nz_in_row) num_threads(nthread) default(none)
     {
 // Calcola il massimo numero di elementi non nulli in una riga
 #pragma omp for schedule(static, chunk_size)
@@ -91,13 +88,18 @@ int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, d
     // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
     int counter = 0;
 
-#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, M, values, col_indices, I, val, J, nz, max_so_far, counter) num_threads(nthreads) private(offset) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, M, values, col_indices, I, val, J, nz, max_so_far, counter) num_threads(nthread) private(offset) default(none)
     for (int i = 0; i < M; i++)
     {
 
         offset = 0;
         for (int j = 0; j < nz; j++)
         {
+            /*warning: In questa conversione parallela gli array values e col_indices in diverse iterazioni rimangono invariati
+             * poichè il thread i-esimo va a modificare la componente (i, offset), entrambe variabili private per i. Di conseguenza,
+             * il risultato del prodotto matrice-vettore, nonostante non sia commutativo in aritmetica floating point, rimane invariato
+             * in diverse esecuzioni.
+             */
             if (I[j] == i)
             {
                 if (val != NULL)
@@ -140,19 +142,16 @@ int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, d
     return max_so_far;
 }
 
-int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
+int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp, int nthread)
 {
-    int i, j, k;
-    int max_nz_per_row = 0;
-    int max_so_far = 0;
-    int *end = NULL;
-    int *curr = NULL;
-    int offset = 0;
     int *occ;
     int *sum_occ;
+    int chunk_size = 0;
+    int not_empty = 0;
+    int num_first_nz_current_row;
+    int my_offset;
 
     printf("Starting parallel CSR conversion ...\n");
-    fflush(stdout);
 
     occ = (int *)calloc(M, sizeof(int));
     if (occ == NULL)
@@ -200,13 +199,6 @@ int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
         occ[I[i]]++;
     }
 
-    printf("Stampa di tutti i non zeri per riga...\n");
-
-    for (int i = 0; i < M; i++)
-    {
-        printf("row %d nz %d\n", i, occ[i]);
-    }
-
     for (int i = 0; i < M; i++)
     {
         if (i == 0)
@@ -218,17 +210,16 @@ int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
     printf("Filling CSR data structure ... \n");
 
     // Riempie gli array CSR
-    offset = 0;
-    int nthread = omp_get_num_procs();
-    int chunk_size = 0;
 
     chunk_size = compute_chunk_size(M, nthread);
 
-    int not_empty = 0;
-    int num_first_nz_current_row;
-    int my_offset;
-
 #pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, M, nz, ja, as, irp, val, I, J, sum_occ) private(my_offset, not_empty, num_first_nz_current_row) default(none)
+
+    /*warning: In questa conversione parallela gli array as e ja in diverse iterazioni rimangono invariati
+     * poichè il thread i-esimo va a modificare la componente (my_offset), variabile privata per i. Di conseguenza,
+     * il risultato del prodotto matrice-vettore, nonostante non sia commutativo in aritmetica floating point, rimane invariato
+     * in diverse esecuzioni.
+     */
 
     for (int i = 0; i < M; i++)
     {
@@ -260,17 +251,23 @@ int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
             (*irp)[i] = -1;
     }
 
-    free(sum_occ);
+    if (sum_occ != NULL )free(sum_occ);
+
+    #ifndef CHECK_CONVERSION 
+        printf("Freeing COO data structures...\n");
+        if (I != NULL) free(I);
+        if (J != NULL) free(J);
+        if (val != NULL) free(val);
+    #endif
 
     printf("Completed parallel CSR conversion ...\n");
 
     return occ;
 }
 
-int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp)
+int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, double *val, double **as, int **ja, int **irp, int nthread)
 {
     int *nz_per_row = NULL;
-    int nthread = omp_get_num_procs();
     int chunk_size = 0;
 
     printf("Starting parallel CSR conversion ...\n");
@@ -348,6 +345,14 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
 
     for (int i = 0; i < nz; i++)
     {
+         /*warning: In questa conversione parallela gli array irp e as in diverse iterazioni possono cambiare
+         * poichè il thread i-esimo e un altro thread j, in concorrenza, possono essere responsabili di diversi elementi (I[i], J[i], val [i] <-->
+         * I[j] == I[i], J[j], val [j])della stessa riga (I[i] == I[j]).
+         * La variabile idx, che è l'indice all'interno dell'array as in corrispondenza del quale assegnare elemento corrente,
+         * è uguale per entrambi. E' possibile quindi, che in diverse esecuzioni, l'elemento x sia posizionato in posizione (idx) dal thread i
+         * oppure che l'elemento y sia posizionato in (idx) dal thread j. "Vince" chi accede prima al blocco critical.
+         * Di conseguenza, il risultato del prodotto matrice-vettore, poichè è commutativo in aritmetica floating point, cambia in diverse esecuzioni.
+         */
         row = I[i];
 #pragma omp critical(CSR_optimization)
         {
@@ -373,22 +378,27 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
     else
         (*irp)[0] = 0;
 
+    #ifndef CHECK_CONVERSION 
+        printf("Freeing COO data structures...\n");
+        if (I != NULL) free(I);
+        if (J != NULL) free(J);
+        if (val != NULL) free(val);
+    #endif
+
     printf("Completed parallel CSR conversion ...\n");
 
     return nz_per_row;
 }
 
-int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
+int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices, int nthread)
 {
-    int nthreads;
     int offset;
     int chunk_size;
     int *nz_per_row = NULL;
-    nthreads = omp_get_num_procs();
 
     printf("ELLPACK parallel started...\n");
 
-    chunk_size = compute_chunk_size(nz, nthreads);
+    chunk_size = compute_chunk_size(nz, nthread);
 
     nz_per_row = (int *)calloc(M, sizeof(int));
 
@@ -398,7 +408,7 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
         exit(1);
     }
 
-#pragma omp parallel for schedule(static, chunk_size) shared(I, nz, chunk_size, nz_per_row) num_threads(nthreads) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(I, nz, chunk_size, nz_per_row) num_threads(nthread) default(none)
     // Calcola il numero di elementi non nulli per riga
     for (int i = 0; i < nz; i++)
     {
@@ -407,12 +417,6 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
     }
 
     printf("Number of zeroes in rows computed\n");
-
-    for (int i = 0; i < M; i++)
-    {
-        if (i % 100 == 0)
-            printf("Riga %d: %d\n", i, nz_per_row[i]);
-    }
 
     // Alloca memoria per gli array ELLPACK
     if (val != NULL)
@@ -463,7 +467,7 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
 
     printf("Malloc for ELLPACK data structures completed\n");
 
-#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, M, values, col_indices, I, val, J, nz, nz_per_row) num_threads(nthreads) private(offset) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, M, values, col_indices, I, val, J, nz, nz_per_row) num_threads(nthread) private(offset) default(none)
     for (int i = 0; i < M; i++)
     {
 
@@ -473,6 +477,11 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
 
         for (int j = 0; j < nz; j++)
         {
+            /*warning: In questa conversione parallela gli array 2D values e col_indices in diverse iterazioni rimangono invariati
+             * poichè il thread i-esimo va a modificare la componente (i, offset), entrambe variabili private per i. Di conseguenza,
+             * il risultato del prodotto matrice-vettore, nonostante non sia commutativo in aritmetica floating point, rimane invariato
+             * in diverse esecuzioni.
+             */
             if (I[j] == i)
             {
                 if (val != NULL)
@@ -488,6 +497,13 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
         }
     }
 
+    #ifndef CHECK_CONVERSION 
+        printf("Freeing COO data structures...\n");
+        if (I != NULL) free(I);
+        if (J != NULL) free(J);
+        if (val != NULL) free(val);
+    #endif
+
     printf("ELLPACK parallel completed...\n");
 
     // for (int j = 0; j < M; j++)
@@ -501,13 +517,11 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
     return nz_per_row;
 }
 
-int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
+int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices, int nthread)
 {
-    int nthreads;
     int offset;
     int chunk_size;
     int *nz_per_row = NULL;
-    nthreads = omp_get_num_procs();
 
     printf("ELLPACK parallel started...\n");
 
@@ -519,7 +533,7 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
         exit(1);
     }
 
-    chunk_size = compute_chunk_size(nz, nthreads);
+    chunk_size = compute_chunk_size(nz, nthread);
 
     nz_per_row = (int *)calloc(M, sizeof(int));
 
@@ -529,7 +543,7 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
         exit(1);
     }
 
-#pragma omp parallel for schedule(static, chunk_size) shared(I, nz, chunk_size, nz_per_row) num_threads(nthreads) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(I, nz, chunk_size, nz_per_row) num_threads(nthread) default(none)
     // Calcola il numero di elementi non nulli per riga
     for (int i = 0; i < nz; i++)
     {
@@ -538,12 +552,6 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
     }
 
     printf("Number of zeroes in rows computed\n");
-
-    for (int i = 0; i < M; i++)
-    {
-        if (i % 100 == 0)
-            printf("Riga %d: %d\n", i, nz_per_row[i]);
-    }
 
     // Alloca memoria per gli array ELLPACK
     if (val != NULL)
@@ -601,9 +609,17 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
     int col_elem;
     double val_elem;
     int k;
-#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, values, col_indices, I, val, J, nz, nz_per_row, curr_idx_per_row) num_threads(nthreads) private(row_elem, k, col_elem, val_elem) default(none)
+#pragma omp parallel for schedule(static, chunk_size) shared(chunk_size, values, col_indices, I, val, J, nz, nz_per_row, curr_idx_per_row) num_threads(nthread) private(row_elem, k, col_elem, val_elem) default(none)
     for (int i = 0; i < nz; i++)
     {
+
+        /*warning: In questa conversione parallela gli array 2D values e col_indices in diverse iterazioni possono cambiare
+         * poichè il thread i-esimo e un altro thread j, in concorrenza, possono essere responsabili di diversi elementi della stessa riga.
+         * La variabile k, che è l'indice corrente all'interno di quella riga in corrispondenza del quale assegnare elemento corrente,
+         * è uguale per entrambi. E' possibile quindi, che in diverse esecuzioni, l'elemento x sia posizionato in posizione (riga di x, k) dal thread i
+         * oppure che l'elemento y sia posizionato in (riga di y, k) dal thread j. NB: riga di x == riga di y
+         * Di conseguenza, il risultato del prodotto matrice-vettore, poichè è commutativo in aritmetica floating point, cambia in diverse esecuzioni.
+         */
         row_elem = I[i];
         col_elem = J[i];
         val_elem = val[i];
@@ -629,7 +645,15 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
         }
     }
 
-    free(curr_idx_per_row);
+    if (curr_idx_per_row != NULL) free(curr_idx_per_row);
+
+    #ifndef CHECK_CONVERSION 
+        printf("Freeing COO data structures...\n");
+        if (I != NULL) free(I);
+        if (J != NULL) free(J);
+        if (val != NULL) free(val);
+    #endif
+
     printf("ELLPACK parallel completed...\n");
 
     // for (int j = 0; j < M; j++)

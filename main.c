@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
 
 #ifdef CHECK_CONVERSION
 
-    cmp_conversation = compare_conversion_algorithms_ellpack(M, N, nz, I, J, val);
+    cmp_conversation = compare_conversion_algorithms_ellpack(M, N, nz, I, J, val, nthread);
 
     if (f != stdin)
         fclose(f);
@@ -243,13 +243,13 @@ int main(int argc, char *argv[])
 #else // NOT CHECK_CONVERSION
 
     /* Questa versione per la conversione di Ellpack memorizza i byte 0x00 di padding */
-    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
     /* Questa versione per la conversione di Ellpack non memorizza i byte 0x00 di padding */
-    // int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices);
+    // int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
     /* Questa versione per la conversione di Ellpack ottimizza la versione che non usa il padding */
-    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices);
+    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
 #endif // CHECK_CONVERSION
 
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
 
 #ifdef CHECK_CONVERSION
 
-    cmp_conversation = compare_conversion_algorithms_csr(M, N, nz, I, J, val);
+    cmp_conversation = compare_conversion_algorithms_csr(M, N, nz, I, J, val, nthread);
 
     if (f != stdin)
         fclose(f);
@@ -271,8 +271,8 @@ int main(int argc, char *argv[])
 
 #else // NOT CHECK_CONVERSION
 
-    // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp);
+    // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A, nthread);
+    coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp, nthread);
 
 #endif // CHECK_CONVERSION
 
@@ -287,7 +287,18 @@ int main(int argc, char *argv[])
 
     y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
 
+#ifdef OPENMP
+
     y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
+
+    free_X(N, X);
+
+#endif
+
+#ifdef CUDA
+#endif
+
+    free_ELLPACK_data_structures(M, values, col_indices);
 
 #endif // ELLPACK
 
@@ -297,14 +308,21 @@ int main(int argc, char *argv[])
 
 #ifdef OPENMP
     y_parallel_omp = parallel_product_CSR(M, N, k, nz, as, ja, irp, X, NULL, nthread);
+
+    free_X(N, X);
+
 #endif // OPENMP
 
 #ifdef CUDA
+
     y_parallel_cuda = CSR_GPU(M, N, k, nz, as, ja, irp, X, NULL);
-  
+
 #endif // CUDA
 
+    free_CSR_data_structures(as, ja, irp);
+
 #endif // CSR
+
 
     for (int i = 0; i < M; i++)
     {
@@ -325,6 +343,16 @@ int main(int argc, char *argv[])
         }
     }
     printf("Same results...\n");
+
+    printf("Freeing matrix y...\n");
+    free_y(M,y_serial);
+    #ifdef OPENMP
+    free_y(M,y_parallel_omp);
+    #endif
+    #ifdef CUDA
+    free(y_parallel_cuda);
+    #endif
+   
 
 #endif // CORRECTNESS
 

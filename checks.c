@@ -3,7 +3,7 @@
 #include "header.h"
 
 #ifdef ELLPACK
-int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, double *val)
+int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, double *val, int nthread)
 {
     double **values_A = NULL;
     double **values_B = NULL;
@@ -14,8 +14,8 @@ int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, 
     int *nz_per_row_A = NULL;
     int *nz_per_row_B = NULL;
 
-    nz_per_row_A = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values_A, &col_indices_A);
-    nz_per_row_B = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values_B, &col_indices_B);
+    nz_per_row_A = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values_A, &col_indices_A, nthread);
+    nz_per_row_B = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values_B, &col_indices_B, nthread);
 
     for (int i = 0; i < M; i++)
     {
@@ -56,6 +56,22 @@ int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, 
         }
     }
 
+    printf("Freeing memory...\n");
+    if (I != NULL)
+        free(I);
+    if (J != NULL)
+        free(J);
+    if (val != NULL)
+        free(val);
+
+    free_ELLPACK_data_structures(M, values_A, col_indices_A);
+    free_ELLPACK_data_structures(M, values_B, col_indices_B);
+
+    if (nz_per_row_A != NULL)
+        free(nz_per_row_A);
+    if (nz_per_row_B != NULL)
+        free(nz_per_row_B);
+
     printf("Same ELLPACK conversions\n");
 
     return 0;
@@ -63,7 +79,7 @@ int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, 
 #endif
 
 #ifdef CSR
-int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, double *val)
+int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, double *val, int nthread)
 {
     double *as_A = NULL;
     double *as_B = NULL;
@@ -77,8 +93,8 @@ int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, doub
     int *nz_per_row_A = NULL;
     int *nz_per_row_B = NULL;
 
-    nz_per_row_A = coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A);
-    nz_per_row_B = coo_to_CSR_parallel(M, N, nz, I, J, val, &as_B, &ja_B, &irp_B);
+    nz_per_row_A = coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A, nthread);
+    nz_per_row_B = coo_to_CSR_parallel(M, N, nz, I, J, val, &as_B, &ja_B, &irp_B, nthread);
 
     for (int i = 0; i < M; i++)
     {
@@ -118,6 +134,23 @@ int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, doub
             }
         }
     }
+
+    printf("Freeing memory...\n");
+
+    if (I != NULL)
+        free(I);
+    if (J != NULL)
+        free(J);
+    if (val != NULL)
+        free(val);
+
+    free_CSR_data_structures(as_A, ja_A, irp_A);
+    free_CSR_data_structures(as_B, ja_B, irp_B);
+
+    if (nz_per_row_A != NULL)
+        free(nz_per_row_A);
+    if (nz_per_row_B != NULL)
+        free(nz_per_row_B);
 
     printf("Same CSR conversions\n");
 

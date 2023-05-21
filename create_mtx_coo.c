@@ -224,6 +224,5 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     }
 
     *nz = computed_nz;
-
     printf("TOTAL NZ for a symmetric matrix: %d\n", *nz);
 }

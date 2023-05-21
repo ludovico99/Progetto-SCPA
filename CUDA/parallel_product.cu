@@ -322,9 +322,7 @@ double * CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_ir
     }
 
     // Free host memory
-    // free(h_A);
-    // free(h_B);
-    // free(h_C);
+    free(h_X);
 
     printf("Completed parallel product ...\n");
 

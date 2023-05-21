@@ -102,6 +102,11 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
     //     }
     // }
 
+    printf("Freeing COO data structures...\n");
+    if (I != NULL) free(I);
+    if (J != NULL) free(J);
+    if (val != NULL) free(val);
+
     return max_nz_per_row;
 }
 
@@ -198,7 +203,12 @@ void coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
     else 
         (*irp)[0] = 0;
     
-    free(nz_per_row);
+    if (nz_per_row != NULL) free(nz_per_row);
+
+    printf("Freeing COO data structures...\n");
+    if (I != NULL) free(I);
+    if (J != NULL) free(J);
+    if (val != NULL) free(val);
 
     printf("Completed serial CSR conversion ...\n");
 }
