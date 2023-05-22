@@ -338,9 +338,9 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int * 
             for (int j = 0; j < nz_per_row[i]; j++)
             {
                 if (d_values != NULL)
-                    partial_sum += d_values[i * offset + j] * d_X[d_col_indices[i * offset + j] * K + z];
+                    partial_sum += d_values[offset + j] * d_X[d_col_indices[offset + j] * K + z];
                 else
-                    partial_sum += 1.0 * d_X[d_col_indices[i * offset + j] * K + z];
+                    partial_sum += 1.0 * d_X[d_col_indices[offset + j] * K + z];
             }
             d_y[i * K + z] = partial_sum;
         }
@@ -403,7 +403,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         exit(EXIT_FAILURE);
     }
 
-    err = cudaMalloc((void **)&d_values, M * nz * sizeof(double));
+    err = cudaMalloc((void **)&d_values, nz * sizeof(double));
 
     if (err != cudaSuccess)
     {
@@ -412,7 +412,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         exit(EXIT_FAILURE);
     }
 
-    err = cudaMalloc((void **)&d_col_indices, M * nz * sizeof(int));
+    err = cudaMalloc((void **)&d_col_indices, nz * sizeof(int));
 
     if (err != cudaSuccess)
     {
@@ -443,7 +443,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     // vectors in device memory
     printf("Copy input data from the host memory to the CUDA device\n");
 
-    err = cudaMemcpy(d_values, h_values, M * nz * sizeof(double), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_values, h_values, nz * sizeof(double), cudaMemcpyHostToDevice);
 
     if (err != cudaSuccess)
     {
@@ -453,7 +453,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         exit(EXIT_FAILURE);
     }
 
-    err = cudaMemcpy(d_col_indices, h_col_indices, M * nz * sizeof(int), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_col_indices, h_col_indices, nz * sizeof(int), cudaMemcpyHostToDevice);
 
     if (err != cudaSuccess)
     {

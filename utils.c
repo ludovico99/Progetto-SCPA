@@ -112,7 +112,7 @@ double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, doubl
 
     unsigned long  sum_nz = 0;
 
-    double *ret = (double *)calloc(M * nz, sizeof(double));
+    double *ret = (double *)calloc(nz, sizeof(double));
     if (ret == NULL)
     {
         printf("Malloc failed for ret ...\n");
@@ -126,7 +126,7 @@ double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, doubl
         for (int j = 0; j < nz_per_row[i]; j++)
         {
             if (A[i] != NULL)
-                ret[i * sum_nz + j] = A[i][j];
+                ret[sum_nz + j] = A[i][j];
         }
         sum_nz += nz_per_row[i];
         if (A[i] != NULL)
@@ -142,7 +142,7 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
     unsigned long sum_nz = 0;
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
 
-    int *ret = (int *)calloc(M * nz, sizeof(int));
+    int *ret = (int *)calloc(nz, sizeof(int));
     if (ret == NULL)
     {
         printf("Malloc failed for ret ...");
@@ -156,7 +156,7 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
         for (int j = 0; j < nz_per_row[i]; j++)
         {
             if (A[i] != NULL)
-                ret[i * sum_nz + j] = A[i][j];
+                ret[sum_nz + j] = A[i][j];
         }
         sum_nz += nz_per_row[i];
 

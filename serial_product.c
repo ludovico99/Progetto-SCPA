@@ -189,8 +189,7 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
     //     }
     //     printf("\n");
     // }
-
-    AUDIT printf("\n");
+    // printf("\n");
     return y;
 }
 
