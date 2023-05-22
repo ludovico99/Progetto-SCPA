@@ -52,7 +52,7 @@ void free_ELLPACK_data_structures(int M, double **values, int **col_indices)
         free(col_indices);
 }
 
-void free_X(int N, double ** X)
+void free_X(int N, double **X)
 {
 
     printf("Freeing matrix X...\n");
@@ -67,7 +67,7 @@ void free_X(int N, double ** X)
         free(X);
 }
 
-void free_y(int M, double ** y)
+void free_y(int M, double **y)
 {
 
     for (int i = 0; i < M; i++)
@@ -80,64 +80,109 @@ void free_y(int M, double ** y)
         free(y);
 }
 
-double *convert_2D_to_1D (int M, int K, double **A){
+double *convert_2D_to_1D(int M, int K, double **A)
+{
 
-
-    double * ret = (double*)malloc(M * K * sizeof(double));
-    if (ret == NULL){
+    double *ret = (double *)calloc(M * K, sizeof(double));
+    if (ret == NULL)
+    {
         printf("Malloc failed for ret ...");
         exit(1);
     }
     printf("Starting 2D conversion in 1D\n");
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < K; j++){
-            ret[i*K + j] = A[i][j];
+    for (int i = 0; i < M; i++)
+    {
+        for (int j = 0; j < K; j++)
+        {
+            if (A[i] != NULL)
+                ret[i * K + j] = A[i][j];
         }
-        free(A[i]);
+        if (A[i] != NULL)
+            free(A[i]);
     }
-    if (A != NULL) free(A);
+    if (A != NULL)
+        free(A);
     return ret;
-
 }
 
-double *convert_2D_to_1D_per_ragged_matrix (int M, int nz, int * nz_per_row, double ** A){
+double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, double **A)
+{
 
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
 
-    double * ret = (double*)malloc(M * nz * sizeof(double));
-    if (ret == NULL){
+    unsigned long  sum_nz = 0;
+
+    double *ret = (double *)calloc(M * nz, sizeof(double));
+    if (ret == NULL)
+    {
         printf("Malloc failed for ret ...\n");
         exit(1);
     }
-  
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < nz_per_row[i]; j++){
-            ret[i*nz_per_row[i] + j] = A[i][j];
-        }
-        free(A[i]);
-    }
-    if (A != NULL) free(A);
-    return ret;
 
+    for (int i = 0; i < M; i++)
+    {
+        if (nz_per_row[i] == 0)
+            continue;
+        for (int j = 0; j < nz_per_row[i]; j++)
+        {
+            if (A[i] != NULL)
+                ret[i * sum_nz + j] = A[i][j];
+        }
+        sum_nz += nz_per_row[i];
+        if (A[i] != NULL)
+            free(A[i]);
+    }
+    if (A != NULL)
+        free(A);
+    return ret;
 }
 
-int *convert_2D_to_1D_per_ragged_matrix (int M, int nz, int * nz_per_row, int ** A){
-
+int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
+{
+    unsigned long sum_nz = 0;
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
-    
-    int * ret = (int*)malloc(M * nz * sizeof(int));
-    if (ret == NULL){
+
+    int *ret = (int *)calloc(M * nz, sizeof(int));
+    if (ret == NULL)
+    {
         printf("Malloc failed for ret ...");
         exit(1);
     }
-  
-    for (int i = 0; i < M; i ++) {
-        for (int j = 0; j < nz_per_row[i]; j++){
-            ret[i*nz_per_row[i]+ j] = A[i][j];
-        }
-        free(A[i]);
-    }
-    if (A != NULL) free(A);
-    return ret;
 
+    for (int i = 0; i < M; i++)
+    {
+        if (nz_per_row[i] == 0)
+            continue;
+        for (int j = 0; j < nz_per_row[i]; j++)
+        {
+            if (A[i] != NULL)
+                ret[i * sum_nz + j] = A[i][j];
+        }
+        sum_nz += nz_per_row[i];
+
+        if (A[i] != NULL)
+            free(A[i]);
+    }
+    if (A != NULL)
+        free(A);
+    return ret;
+}
+
+int *compute_sum_nz(int M, int *nz_per_row)
+{
+
+    printf("Computing sum_nz\n");
+
+    int *ret = (int *)calloc(M, sizeof(int));
+    if (ret == NULL)
+    {
+        printf("Malloc failed for ret ...");
+        exit(1);
+    }
+    ret[1] = nz_per_row[0];
+    for (int i = 2; i < M; i++)
+    {
+        ret[i] = ret[i - 1] + nz_per_row[i - 1];
+    }
+    return ret;
 }

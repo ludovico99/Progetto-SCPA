@@ -74,8 +74,9 @@ extern double *convert_2D_to_1D (int, int, double **);
 extern double *convert_2D_to_1D_per_ragged_matrix (int ,int, int * , double ** );
 extern int *convert_2D_to_1D_per_ragged_matrix (int , int,  int * , int ** );
 
-extern double compute_GFLOPS(int k, int nz, double time);
+extern double compute_GFLOPS(int, int, double);
 extern int compute_chunk_size(int, int);
+extern int * compute_sum_nz (int, int *);
 extern void coo_general(int, int *, int *, int *, int **, int **, double **, int);
 extern void coo_symm(int, int *, int *, int *, int **, int **, double **, int);
 extern void create_dense_matrix(int, int, double ***);

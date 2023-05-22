@@ -123,6 +123,13 @@ Cube_Coup_dt0:
 ML_Laplace:
 	./app Matrici/ML_Laplace/ML_Laplace.mtx 
 
+	
+max_nz_by_row:
+	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1 " | wc -l
+#cat ../Matrici/bcsstk17/bcsstk17.mtx | grep "^[0-9]* 4 " | wc -l
+print_elem_by_row:
+	cat Matrici/bcsstk17/bcsstk17.mtx | grep "^1 "
+
 clean:
 	rm -f *.o
 	rm app

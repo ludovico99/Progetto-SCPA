@@ -10,7 +10,7 @@
 #include <helper_timer.h> // For CUDA SDK timers
 #include "../header.h"
 
-__global__ void CSR_kernel(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
+__global__ void CSR_kernel(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -223,7 +223,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
-    CSR_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    CSR_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
     err = cudaGetLastError();
 
     if (err != cudaSuccess)
@@ -321,14 +321,14 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     return h_y;
 }
 
-__global__ void ELLPACK_kernel(const int M, const int N, const int K, int *nz_per_row, double *d_values, int *d_col_indices, double *d_X, double *d_y, int numElements)
+__global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int * sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, int numElements)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     int i = tid / K;
     int z = tid % K;
     double partial_sum = 0.0;
-
+    int offset = sum_nz[i];
     if (tid < numElements)
     {
         if (nz_per_row[i] == 0)
@@ -338,11 +338,10 @@ __global__ void ELLPACK_kernel(const int M, const int N, const int K, int *nz_pe
             for (int j = 0; j < nz_per_row[i]; j++)
             {
                 if (d_values != NULL)
-                    partial_sum += d_values[i * nz_per_row[i] + j] * d_X[d_col_indices[i * nz_per_row[i] + j] * K + z];
+                    partial_sum += d_values[i * offset + j] * d_X[d_col_indices[i * offset + j] * K + z];
                 else
-                    partial_sum += 1.0 * d_X[d_col_indices[i * nz_per_row[i] + j] * K + z];
+                    partial_sum += 1.0 * d_X[d_col_indices[i * offset + j] * K + z];
             }
-
             d_y[i * K + z] = partial_sum;
         }
     }
@@ -368,6 +367,9 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     int *d_col_indices = NULL;
     int *d_nz_per_row = NULL;
 
+    int * h_sum_nz = NULL;
+    int * d_sum_nz = NULL;
+
     float expireTimeMsec = 0.0;
 
     h_X = convert_2D_to_1D(M, K, X);
@@ -382,7 +384,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     h_values = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, values);
     h_col_indices = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, col_indices);
 
-    printf("Allocating device variables for CPU CSR product ...\n");
+    printf("Allocating device variables for CPU ELLPACK product ...\n");
 
     err = cudaMalloc((void **)&d_y, M * K * sizeof(double));
     if (err != cudaSuccess)
@@ -396,7 +398,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     if (err != cudaSuccess)
     {
-        fprintf(stderr, "Failed to allocate device irp (error code %s)!\n",
+        fprintf(stderr, "Failed to allocate device X (error code %s)!\n",
                 cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
@@ -424,6 +426,15 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     if (err != cudaSuccess)
     {
         fprintf(stderr, "Failed to allocate device nz_per_row (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMalloc((void **)&d_sum_nz, M * sizeof(int));
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to allocate device sum_mz (error code %s)!\n",
                 cudaGetErrorString(err));
         exit(EXIT_FAILURE);
     }
@@ -470,6 +481,16 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         exit(EXIT_FAILURE);
     }
 
+    h_sum_nz = compute_sum_nz(M, nz_per_row);
+    err = cudaMemcpy(d_sum_nz, h_sum_nz, M * sizeof(int), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr,
+                "Failed to copy device sum_nz from host to device (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
     // Launch the Vector Add CUDA Kernel
     int numElements = M * K;
     int threadsPerBlock = 1024;
@@ -484,7 +505,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
-    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, d_nz_per_row, d_values, d_col_indices, d_X, d_y, numElements);
+    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, numElements);
     err = cudaGetLastError();
 
     if (err != cudaSuccess)
@@ -563,11 +584,21 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         exit(EXIT_FAILURE);
     }
 
+    err = cudaFree(d_sum_nz);
+
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to free device sum_nz (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
     // Free host memory
     printf("Freeing host memory ...\n");
-    free(h_X);
-    free(h_values);
-    free(h_col_indices);
+    if (h_X != NULL) free(h_X);
+    if (h_values != NULL) free(h_values);
+    if (h_col_indices != NULL) free(h_col_indices);
+    if (h_sum_nz != NULL) free(h_sum_nz);
 
     printf("Completed parallel product ...\n");
 
