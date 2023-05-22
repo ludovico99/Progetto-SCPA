@@ -6,7 +6,9 @@
         "numeric": "cpp",
         "mmio.h": "c",
         "stdio.h": "c",
-        "fcntl.h": "c"
+        "fcntl.h": "c",
+        "stdlib.h": "c",
+        "header.h": "c"
     },
     "cmake.sourceDirectory": "/home/ludovico99/Scrivania/Progetto-SCPA/CUDA",
     "C_Cpp.errorSquiggles": "disabled"

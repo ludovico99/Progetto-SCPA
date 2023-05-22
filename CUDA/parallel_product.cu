@@ -308,16 +308,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Completed parallel product ...\n");
 
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.70lf\t", i, z, h_y[i*K + z]);
-    //     }
-    //     printf("\n");
-    // }
-
     return h_y;
 }
 
@@ -601,16 +591,6 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     if (h_sum_nz != NULL) free(h_sum_nz);
 
     printf("Completed parallel product ...\n");
-
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.70lf\t", i, z, h_y[i*K + z]);
-    //     }
-    //     printf("\n");
-    // }
 
     return h_y;
 }

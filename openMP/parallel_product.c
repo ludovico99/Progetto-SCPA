@@ -99,22 +99,12 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja
     if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
-
-    // for (int i = 0; i < M; i++)
-    // {
-    //     AUDIT printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         AUDIT printf("y[%d][%d] = %.66lf ", i, z, y[i][z]);
-    //     }
-    // }
-
-    // AUDIT printf("\n");
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
     return y;
 }
 
-double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X, double *time, int nthread)
+double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row, double **as, int **ja, double **X, double *time, int nthread)
 {
 
     double **y = NULL;
@@ -195,22 +185,12 @@ double **parallel_product_ellpack(int M, int N, int K, int max_nz_per_row, doubl
     if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
-    //     }
-    //     printf("\n");
-    // }
-
-    AUDIT printf("\n");
     return y;
 }
 
-double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_per_row, double **as, int **ja, double **X, double * time, int nthread)
+double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int* nz_per_row, double **as, int **ja, double **X, double * time, int nthread)
 {
 
     double **y = NULL;
@@ -285,17 +265,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int* nz_p
     if (time != NULL) *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
-    //     }
-    //     printf("\n");
-    // }
-
-    AUDIT printf("\n");
     return y;
 }

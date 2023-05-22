@@ -8,7 +8,7 @@
 #include <time.h>
 #include <math.h>
 
-#include "mmio.h"
+#include "lib/mmio.h"
 #include "header.h"
 
 #define SAMPLING_SIZE 30
@@ -289,11 +289,11 @@ int main(int argc, char *argv[])
 
 #ifdef ELLPACK
 
-    y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL);
+    y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL);
 
 #ifdef OPENMP
 
-    y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz_per_row, values, col_indices, X, NULL, nthread);
+    y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL, nthread);
 
     free_X(N, X);
     free_ELLPACK_data_structures(M, values, col_indices);

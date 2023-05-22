@@ -1,3 +1,4 @@
+#------------------------------------------------------------------------- CUDA ---------------------------------------------------------------------------------------------------------
 cudaPath=/usr/local/cuda_save_11.2
 CC = 75
 binDir=./bin
@@ -27,7 +28,7 @@ build: app
 main.o: main.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-mmio.o: mmio.c
+mmio.o: ./lib/mmio.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
 conversions_parallel.o: conversions_parallel.c
@@ -54,44 +55,35 @@ create_mtx_coo.o: create_mtx_coo.c
 app: main.o mmio.o conversions_parallel.o parallel_product.o serial_product.o utils.o create_mtx_coo.o
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
 
-copy-openMP:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/openMP ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+#------------------------------------------------------------------------- OPENMP ---------------------------------------------------------------------------------------------------------
 
-copy-CUDA:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
-
-copy-deviceQuery:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA_dev_query ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
-
-copy-code:
-	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/ ludozarr99@160.80.85.52:/data/ludozarr99/
-
-copy-make:
-	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/Makefile ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA/
+SOURCES= conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c lib/mmio.c main.c utils.c create_mtx_coo.c
 
 openmp-csr-compare-serial-parallel:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o app
 
 openmp-ellpack-compare-serial-parallel:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o app
 
 openmp-csr-check-conversions:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  $(SOURCES) checks.c -o app
 
 openmp-ellpack-check-conversions:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION $(SOURCES) checks.c -o app
 
 openmp-csr-serial-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o app
 
 openmp-csr-parallel-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
 
 openmp-ellpack-serial-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
 
 openmp-ellpack-parallel-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c mmio.c main.c utils.c create_mtx_coo.c checks.c samplings.c -o app
+	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+
+#------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
 
 matrice_prova:
 	./app Matrici/prova.mtx 
@@ -123,13 +115,34 @@ Cube_Coup_dt0:
 ML_Laplace:
 	./app Matrici/ML_Laplace/ML_Laplace.mtx 
 
-	
+#------------------------------------------------------------------------- DEBUG SCRIPTS ---------------------------------------------------------------------------------------------------------
+
 max_nz_by_row:
 	cat Matrici/adder_dcop_32/adder_dcop_32.mtx | grep "^1 " | wc -l
 #cat ../Matrici/bcsstk17/bcsstk17.mtx | grep "^[0-9]* 4 " | wc -l
 print_elem_by_row:
 	cat Matrici/bcsstk17/bcsstk17.mtx | grep "^1 "
 
+#------------------------------------------------------------------------- CLEAN ---------------------------------------------------------------------------------------------------------
+
 clean:
 	rm -f *.o
 	rm app
+
+
+#------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
+
+copy-openMP:
+	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/openMP ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+
+copy-CUDA:
+	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+
+copy-deviceQuery:
+	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA_dev_query ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+
+copy-code:
+	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/ ludozarr99@160.80.85.52:/data/ludozarr99/
+
+copy-make:
+	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/Makefile ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA/

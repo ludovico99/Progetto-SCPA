@@ -90,21 +90,12 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
-    // for (int i = 0; i < M; i++)
-    // {
-    //     AUDIT printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         AUDIT printf("y[%d][%d] = %lf ", i, z, y[i][z]);
-    //     }
-    // }
-
-    // AUDIT printf("\n");
     return y;
 }
 
-double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double **as, int **ja, double **X, double *time)
+double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row, double **as, int **ja, double **X, double *time)
 {
 
     double **y = NULL;
@@ -179,60 +170,12 @@ double **serial_product_ellpack(int M, int N, int K, int max_nz_per_row, double 
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
-
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\n");
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
+    
     return y;
 }
 
-double **serial_product(int M, int N, int K, double **A, double **X)
-{
-    double **y = NULL;
-
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
-
-    for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
-    }
-
-    // calcola il prodotto matrice - multi-vettore
-    for (int i = 0; i < M; i++)
-    {
-        for (int z = 0; z < K; z++)
-        {
-            for (int j = 0; j < N; j++)
-            {
-                y[i][z] += A[i][j] * X[j][z];
-            }
-        }
-    }
-    return y;
-}
-
-double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int *nz_per_row, double **as, int **ja, double **X, double *time)
+double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int *nz_per_row, double **as, int **ja, double **X, double *time)
 {
 
     double **y = NULL;
@@ -300,17 +243,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int *nz_per
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
+    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
-    // for (int i = 0; i < M; i++)
-    // {
-    //     printf("\n");
-    //     for (int z = 0; z < K; z++)
-    //     {
-    //         printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
-    //     }
-    //     printf("\n");
-    // }
-
-    AUDIT printf("\n");
     return y;
 }

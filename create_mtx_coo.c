@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "mmio.h"
+#include "lib/mmio.h"
 #include "header.h"
 
 static FILE *init_stream(void)

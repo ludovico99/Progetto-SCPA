@@ -1,5 +1,5 @@
 #include "header.h"
-#include "mmio.h"
+#include "lib/mmio.h"
 #include "stdlib.h"
 /* Computazione della dimensione del chunk per parallelizzare */
 int compute_chunk_size(int value, int nthread)
@@ -80,6 +80,7 @@ void free_y(int M, double **y)
         free(y);
 }
 
+#ifdef CUDA
 double *convert_2D_to_1D(int M, int K, double **A)
 {
 
@@ -110,7 +111,7 @@ double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, doubl
 
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
 
-    unsigned long  sum_nz = 0;
+    unsigned long sum_nz = 0;
 
     double *ret = (double *)calloc(nz, sizeof(double));
     if (ret == NULL)
@@ -167,6 +168,7 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
         free(A);
     return ret;
 }
+#endif
 
 int *compute_sum_nz(int M, int *nz_per_row)
 {
@@ -185,4 +187,31 @@ int *compute_sum_nz(int M, int *nz_per_row)
         ret[i] = ret[i - 1] + nz_per_row[i - 1];
     }
     return ret;
+}
+
+void print_y (int M, int K, double ** y){
+        for (int i = 0; i < M; i++)
+    {
+        printf("\n");
+        for (int z = 0; z < K; z++)
+        {
+            printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void print_y_GPU (int M, int K, double *y){
+    
+    for (int i = 0; i < M; i++)
+    {
+        printf("\n");
+        for (int z = 0; z < K; z++)
+        {
+            printf("y[%d][%d] = %.70lf\t", i, z, y[i*K + z]);
+        }
+        printf("\n");
+    }
+    printf("\n");
 }
