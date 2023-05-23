@@ -142,7 +142,7 @@ copy-deviceQuery:
 	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA_dev_query ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
 
 copy-code:
-	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/ ludozarr99@160.80.85.52:/data/ludozarr99/
+	scp -i /home/cap/.ssh/id_rsa  -r /home/cap/Progetto-SCPA/ lcapotombolo@160.80.85.52:/data/lcapotombolo/
 
 copy-make:
 	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/Makefile ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA/
