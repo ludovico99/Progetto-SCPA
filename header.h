@@ -82,8 +82,9 @@ extern void coo_general(int, int *, int *, int *, int **, int **, double **, int
 extern void coo_symm(int, int *, int *, int *, int **, int **, double **, int);
 extern void create_dense_matrix(int, int, double ***);
 extern void free_y(int, double **);
-extern void print_y (int M, int K, double ** y);
-extern void print_y_GPU (int M, int K, double *y);
+extern void print_y (int, int, double **);
+extern void print_y_GPU (int, int, double *);
+extern double* transpose(int, int, double **);
 
 #ifdef CHECK_CONVERSION
 #ifdef CSR

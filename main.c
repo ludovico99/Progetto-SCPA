@@ -108,6 +108,9 @@ int main(int argc, char *argv[])
 #ifdef ELLPACK
     double **values;
     int **col_indices;
+
+    int *nz_per_row = NULL;
+
 #endif
 
 #ifdef CSR
@@ -226,13 +229,13 @@ int main(int argc, char *argv[])
 #else // NOT CHECK_CONVERSION
 
     /* Questa versione per la conversione di Ellpack memorizza i byte 0x00 di padding */
-    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
+    //int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
     /* Questa versione per la conversione di Ellpack non memorizza i byte 0x00 di padding */
-    // int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
+    // nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
     /* Questa versione per la conversione di Ellpack ottimizza la versione che non usa il padding */
-    int *nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices, nthread);
+    nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
 #endif // CHECK_CONVERSION
 
@@ -288,11 +291,17 @@ int main(int argc, char *argv[])
     create_dense_matrix(N, k, &X);
 
 #ifdef ELLPACK
+     /* Questa versione per il prodotto seriale utilizza la conversione ELLPACK con i byte 0x00 di padding */
+    //y_serial = serial_product_ellpack(M, N, k, nz, max_nz_per_row, values, col_indices, X, NULL);
 
+     /* Questa versione per il prodotto seriale utilizza la conversione ELLPACK senza i byte 0x00 di padding */
     y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL);
 
 #ifdef OPENMP
+     /* Questa versione per il prodotto parallelo utilizza la conversione ELLPACK con i byte 0x00 di padding */
+    //y_parallel_omp = parallel_product_ellpack (M, N, k, nz, max_nz_per_row, values, col_indices, X, NULL, nthread);
 
+     /* Questa versione per il prodotto parallelo utilizza la conversione ELLPACK senza i byte 0x00 di padding */
     y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL, nthread);
 
     free_X(N, X);
@@ -306,7 +315,7 @@ int main(int argc, char *argv[])
 
 #endif
 
-    free (nz_per_row);
+   if (nz_per_row != NULL) free (nz_per_row);
     
 #endif // ELLPACK
 
@@ -344,7 +353,7 @@ int main(int argc, char *argv[])
                 if (y_serial[i][z] != y_parallel_omp[i][z])
 #endif
                 {
-                    printf("Serial result is different ...");
+                    printf("Serial result is different ...\n");
                     exit(0);
                 }
         }

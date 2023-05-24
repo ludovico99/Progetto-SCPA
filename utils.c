@@ -1,6 +1,7 @@
 #include "header.h"
 #include "lib/mmio.h"
 #include "stdlib.h"
+
 /* Computazione della dimensione del chunk per parallelizzare */
 int compute_chunk_size(int value, int nthread)
 {
@@ -10,7 +11,11 @@ int compute_chunk_size(int value, int nthread)
         chunk_size = value / nthread;
     else
         chunk_size = value / nthread + 1;
-
+    /*
+     * 16 è pari al numero di interi in una linea di cache.
+     * E' anche multiplo di 8, che è il numero di double in una cache line.
+     */
+    chunk_size = chunk_size - chunk_size % (16); // E' il numero intero piu vicino a chunk size multiplo di 16.
     return chunk_size;
 }
 
@@ -189,8 +194,9 @@ int *compute_sum_nz(int M, int *nz_per_row)
     return ret;
 }
 
-void print_y (int M, int K, double ** y){
-        for (int i = 0; i < M; i++)
+void print_y(int M, int K, double **y)
+{
+    for (int i = 0; i < M; i++)
     {
         printf("\n");
         for (int z = 0; z < K; z++)
@@ -202,16 +208,39 @@ void print_y (int M, int K, double ** y){
     printf("\n");
 }
 
-void print_y_GPU (int M, int K, double *y){
-    
+void print_y_GPU(int M, int K, double *y)
+{
+
     for (int i = 0; i < M; i++)
     {
         printf("\n");
         for (int z = 0; z < K; z++)
         {
-            printf("y[%d][%d] = %.70lf\t", i, z, y[i*K + z]);
+            printf("y[%d][%d] = %.70lf\t", i, z, y[i * K + z]);
         }
         printf("\n");
     }
     printf("\n");
+}
+
+double* transpose(int N, int K, double **A)
+{   
+    double *ret = NULL;
+
+    printf ("Computing transpose for X ...\n");
+
+    ret = (double*)malloc(sizeof(double)*N*K);
+    if (ret == NULL){
+        printf("Malloc failed for ret ...");
+        exit(1);
+    }
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < K; j++)
+        {
+            ret[j * N + i] = A[i][j];
+        }
+    }
+
+    return ret;
 }

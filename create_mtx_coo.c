@@ -74,7 +74,12 @@ void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **v
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d\n", &((*I)[i]), &((*J)[i]));
+            ret_code = fscanf(f, "%d %d\n", &((*I)[i]), &((*J)[i]));
+            if (ret_code != 2)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             (*I)[i]--; /* adjust from 1-based to 0-based */
             (*J)[i]--;
         }
@@ -83,7 +88,12 @@ void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **v
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d %lg\n", &((*I)[i]), &((*J)[i]), &((*val)[i]));
+            ret_code = fscanf(f, "%d %d %lg\n", &((*I)[i]), &((*J)[i]), &((*val)[i]));
+            if (ret_code != 3)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             (*I)[i]--; /* adjust from 1-based to 0-based */
             (*J)[i]--;
         }
@@ -134,7 +144,12 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d\n", &row, &column);
+            ret_code = fscanf(f, "%d %d\n", &row, &column);
+            if (ret_code != 2)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             if (row == column)
             {
                 computed_nz--;
@@ -145,7 +160,12 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d %lg\n", &row, &column, &value);
+            ret_code = fscanf(f, "%d %d %lg\n", &row, &column, &value);
+            if (ret_code != 3)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             if (row == column)
             {
                 computed_nz--;
@@ -185,7 +205,12 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d\n", &((*I)[i]), &((*J)[i]));
+            ret_code = fscanf(f, "%d %d\n", &((*I)[i]), &((*J)[i]));
+            if (ret_code != 2)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             (*I)[i]--; /* adjust from 1-based to 0-based */
             (*J)[i]--;
 
@@ -202,7 +227,12 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     {
         for (int i = 0; i < *nz; i++)
         {
-            fscanf(f, "%d %d %lg\n", &((*I)[i]), &((*J)[i]), &((*val)[i]));
+            ret_code = fscanf(f, "%d %d %lg\n", &((*I)[i]), &((*J)[i]), &((*val)[i]));
+            if (ret_code != 3)
+            {
+                printf("An error has occured reading the file ...");
+                exit(1);
+            }
             (*I)[i]--; /* adjust from 1-based to 0-based */
             (*J)[i]--;
 

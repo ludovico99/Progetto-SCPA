@@ -506,14 +506,6 @@ int *coo_to_ellpack_no_zero_padding_parallel(int M, int N, int nz, int *I, int *
 
     printf("ELLPACK parallel completed...\n");
 
-    // for (int j = 0; j < M; j++)
-    // {
-    //     for(int k = 0; k < nz_per_row[j]; k++)
-    //     {
-    //         printf("ELLPACK VALUE: %.66lf - COL: %d\n", (*values)[j][k], (*col_indices)[j][k]);
-    //     }
-    // }
-
     return nz_per_row;
 }
 
@@ -655,14 +647,6 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
     #endif
 
     printf("ELLPACK parallel completed...\n");
-
-    // for (int j = 0; j < M; j++)
-    // {
-    //     for(int k = 0; k < max_so_far; k++)
-    //     {
-    //        AUDIT printf("ELLPACK VALUE: %.66lf - COL: %d\n", (*values)[j][k], (*col_indices)[j][k]);
-    //     }
-    // }
 
     return nz_per_row;
 }

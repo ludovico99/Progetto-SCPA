@@ -9,11 +9,12 @@
 
 #include "header.h"
 
-double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A, int *irp_A, double **X, double *time)
+double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, int *irp, double **X, double *time)
 {
 
     double **y = NULL;
     struct timespec start, stop;
+    double partial_sum = 0.0;
 
     AUDIT printf("Computing serial product ...\n");
     y = (double **)malloc(M * sizeof(double *));
@@ -37,7 +38,9 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
         }
     }
     AUDIT printf("y correctly allocated ... \n");
+
     // calcola il prodotto matrice - multi-vettore
+
     if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
         perror("Errore clock()");
@@ -48,32 +51,31 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
     {
 
         for (int z = 0; z < K; z++)
-        {   
-            if (i == 0 && irp_A[i] == -1){
+        {
+            if (i == 0 && irp[i] == -1)
+            {
                 AUDIT printf("Row 0 is the vector zero\n");
                 y[i][z] = 0.0;
             }
-            if (i > 0 && irp_A[i] == irp_A[i - 1])
+            if (i > 0 && irp[i] == irp[i - 1])
             {
                 AUDIT printf("Row %d is the vector zero\n", i);
                 y[i][z] = 0.0;
             }
             else
             {
-                // AUDIT printf("Computing y[%d][%d]\n", i, z);
+                double partial_sum = 0.0;
+                int start = irp[i];
+                int end = irp[i + 1];
 
-                // if (i < (M - 1))
-                //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d e id della colonna del primo nz zero della riga successiva %d\n", i, ja_A[irp_A[i]], ja_A[irp_A[i + 1]]);
-                // else
-                //     AUDIT printf("Riga %d, id della colonna del primo nz della riga %d\n", i, ja_A[irp_A[i]]);
-
-                for (int j = irp_A[i]; (i < (M - 1) && j < irp_A[i + 1]) || (i >= M - 1 && j < nz); j++)
+                for (int j = start; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j++)
                 {
-                    if (as_A != NULL)
-                        y[i][z] += as_A[j] * X[ja_A[j]][z];
+                    if (as != NULL)
+                        partial_sum += as[j] * X[ja[j]][z];
                     else
-                        y[i][z] += 1.0 * X[ja_A[j]][z];
+                        partial_sum += 1.0 * X[ja[j]][z];
                 }
+                y[i][z] = partial_sum;
             }
         }
     }
@@ -90,7 +92,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as_A, int *ja_A
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
-    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
+    AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
     return y;
 }
@@ -135,7 +137,6 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
 
         for (int z = 0; z < K; z++)
         {
-            // AUDIT printf("Computing y[%d][%d]\n", i, z);
 
             for (int j = 0; j < max_nz_per_row; j++)
             {
@@ -170,8 +171,8 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
-    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
-    
+    AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
+
     return y;
 }
 
@@ -243,7 +244,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
         *time = accum;
 
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
-    AUDIT printf ("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
+    AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
     return y;
 }

@@ -20,6 +20,7 @@ int mm_read_unsymmetric_sparse(const char *fname, int *M_, int *N_, int *nz_,
     FILE *f;
     MM_typecode matcode;
     int M, N, nz;
+    int ret;
     int i;
     double *val;
     int *I, *J;
@@ -74,7 +75,10 @@ int mm_read_unsymmetric_sparse(const char *fname, int *M_, int *N_, int *nz_,
  
     for (i=0; i<nz; i++)
     {
-        fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+        ret = fscanf(f, "%d %d %lg\n", &I[i], &J[i], &val[i]);
+        if (ret != 3){
+            exit(1);
+        }
         I[i]--;  /* adjust from 1-based to 0-based */
         J[i]--;
     }
