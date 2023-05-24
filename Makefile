@@ -11,7 +11,6 @@ LINK=-lm
 OPENMP=--compiler-options -fopenmp
 INCLUDES=-I${cudaPath}/samples/common/inc
 FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
-LINK=-lm
 
 MODE = csr
 
@@ -131,10 +130,10 @@ clean:
 
 
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
-USERNAME_SRC = $(whoami)
+USERNAME = cap
 SSH_KEY = /home/${USERNAME}/.ssh/id_rsa
 
-USER = Ludovico
+USER = Luca
 
 ifeq ($(USER), Ludovico)
     DIR_SRC = /home/${USERNAME}/Scrivania/Progetto-SCPA
