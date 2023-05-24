@@ -131,18 +131,33 @@ clean:
 
 
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
+USERNAME_SRC = $(whoami)
+SSH_KEY = /home/${USERNAME}/.ssh/id_rsa
+
+USER = Ludovico
+
+ifeq ($(USER), Ludovico)
+    DIR_SRC = /home/${USERNAME}/Scrivania/Progetto-SCPA
+	USERNAME_DEST = ludozarr99
+	DIR_DEST = /data/ludozarr99
+else
+    DIR_SRC = /home/${USERNAME}/Progetto-SCPA
+	USERNAME_DEST = lcapotombolo
+	DIR_DEST = /data/lcapotombolo
+endif
+
 
 copy-openMP:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/openMP ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+	scp -i $(SSH_KEY) -r $(DIR_SRC)/openMP $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA
 
 copy-CUDA:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+	scp -i $(SSH_KEY) -r $(DIR_SRC)/CUDA $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA
 
 copy-deviceQuery:
-	scp -i /home/ludovico99/.ssh/id_rsa -r /home/ludovico99/Scrivania/Progetto-SCPA/CUDA_dev_query ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA
+	scp -i $(SSH_KEY) -r $(DIR_SRC)/CUDA_dev_query $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA
 
 copy-code:
-	scp -i /home/cap/.ssh/id_rsa  -r /home/cap/Progetto-SCPA/ lcapotombolo@160.80.85.52:/data/lcapotombolo/
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/ $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)
 
 copy-make:
-	scp -i /home/ludovico99/.ssh/id_rsa  -r /home/ludovico99/Scrivania/Progetto-SCPA/Makefile ludozarr99@160.80.85.52:/data/ludozarr99/Progetto-SCPA/
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/Makefile $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
