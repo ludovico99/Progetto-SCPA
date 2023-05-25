@@ -36,7 +36,10 @@ conversions_parallel.o: conversions_parallel.c
 conversions_serial.o: conversions_serial.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-parallel_product.o: ./CUDA/parallel_product.cu
+parallel_product_csr.o: ./CUDA/parallel_product_CSR.cu
+	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+
+parallel_product_ellpack.o: ./CUDA/parallel_product_ELLPACK.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
 serial_product.o: serial_product.c
@@ -51,7 +54,7 @@ checks.o: checks.c
 create_mtx_coo.o: create_mtx_coo.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-app: main.o mmio.o conversions_parallel.o parallel_product.o serial_product.o utils.o create_mtx_coo.o
+app: main.o mmio.o conversions_parallel.o parallel_product_csr.o parallel_product_ellpack.o serial_product.o utils.o create_mtx_coo.o
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
 
 #------------------------------------------------------------------------- OPENMP ---------------------------------------------------------------------------------------------------------
@@ -132,7 +135,7 @@ clean:
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
 SSH_KEY = /home/${USERNAME}/.ssh/id_rsa
 
-USER = Luca
+USER = Ludovico
 
 ifeq ($(USER), Ludovico)
     DIR_SRC = /home/${USERNAME}/Scrivania/Progetto-SCPA

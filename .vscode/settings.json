@@ -8,7 +8,16 @@
         "stdio.h": "c",
         "fcntl.h": "c",
         "stdlib.h": "c",
-        "header.h": "c"
+        "header.h": "c",
+        "array": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "stat.h": "c",
+        "types.h": "c"
     },
     "cmake.sourceDirectory": "/home/ludovico99/Scrivania/Progetto-SCPA/CUDA",
     "C_Cpp.errorSquiggles": "disabled"
