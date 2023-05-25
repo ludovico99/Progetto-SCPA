@@ -17,26 +17,16 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
     struct timespec start, stop;
 
     AUDIT printf("Computing parallel product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+
+    memory_allocation(double *, M, y);
+
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
+
     AUDIT printf("y correctly allocated ... \n");
 
     chunk_size = compute_chunk_size(M, nthread);
@@ -56,14 +46,9 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
             int start = irp[i];
             int end = irp[i + 1];
 
-            if (i == 0 && start == -1)
+            if (i < M - 1 && start == end)
             {
-                printf("Row 0 is the vector zero\n");
-                y[i][z] = 0.0;
-            }
-            else if (i > 0 && start == irp[i - 1])
-            {
-                printf("Row %d is the vector zero\n", i);
+                AUDIT printf("Row %d is the vector zero\n", i);
                 y[i][z] = 0.0;
             }
             else
@@ -106,26 +91,16 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
     int chunk_size = 0;
 
     AUDIT printf("Computing parallel product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+    
+    memory_allocation(double *, M, y);
+
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
+
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
 
@@ -193,26 +168,16 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
     int chunk_size = 0;
 
     AUDIT printf("Computing parallel product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+
+    memory_allocation(double *, M, y);
+
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
+    
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
     if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)

@@ -63,28 +63,19 @@ int check_matcode_error(MM_typecode matcode)
     return 0;
 }
 
-void create_dense_matrix(int N, int K, double ***x)
+void create_dense_matrix(int N, int K, double *** X)
 {
 
     AUDIT printf("Creating dense matrix ...\n");
-    *x = (double **)malloc(N * sizeof(double *));
-    if (*x == NULL)
-    {
-        printf("Errore malloc per x\n");
-        exit(1);
-    }
+    memory_allocation(double *, N, *X);
 
     for (int j = 0; j < N; j++)
-    {
-        (*x)[j] = (double *)malloc(K * sizeof(double));
-        if ((*x)[j] == NULL)
-        {
-            printf("Errore malloc per x[j]\n");
-            exit(1);
-        }
+    {   
+        memory_allocation(double, K, (*X)[j] );
+    
         for (int z = 0; z < K; z++)
         {
-            (*x)[j][z] = 1.0;
+            (*X)[j][z] = 1.0;
         }
     }
 

@@ -3,7 +3,7 @@ cudaPath=/usr/local/cuda_save_11.2
 CC = 75
 binDir=./bin
 
-COMPILER_CPP=-x c++ --compiler-options -fpermissive
+COMPILER_CPP=-x c++ -O3 --compiler-options -fpermissive
 COMPILER_CUDA=-x cu
 
 NVCC=nvcc
@@ -62,28 +62,28 @@ app: main.o mmio.o conversions_parallel.o parallel_product_csr.o parallel_produc
 SOURCES= conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c lib/mmio.c main.c utils.c create_mtx_coo.c
 
 openmp-csr-compare-serial-parallel:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o app
 
 openmp-ellpack-compare-serial-parallel:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o app
 
 openmp-csr-check-conversions:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  $(SOURCES) checks.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  $(SOURCES) checks.c -o app
 
 openmp-ellpack-check-conversions:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION $(SOURCES) checks.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION $(SOURCES) checks.c -o app
 
 openmp-csr-serial-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o app
 
 openmp-csr-parallel-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
 
 openmp-ellpack-serial-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
 
 openmp-ellpack-parallel-samplings:
-	gcc -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
 
 #------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
 

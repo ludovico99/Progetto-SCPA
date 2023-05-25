@@ -87,14 +87,10 @@ void free_y(int M, double **y)
 
 #ifdef CUDA
 double *convert_2D_to_1D(int M, int K, double **A)
-{
+{   
+    double * ret = NULL;
+    all_zeroes_memory_allocation(double, M*K, ret);
 
-    double *ret = (double *)calloc(M * K, sizeof(double));
-    if (ret == NULL)
-    {
-        printf("Malloc failed for ret ...");
-        exit(1);
-    }
     printf("Starting 2D conversion in 1D\n");
     for (int i = 0; i < M; i++)
     {
@@ -118,12 +114,8 @@ double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, doubl
 
     unsigned long sum_nz = 0;
 
-    double *ret = (double *)calloc(nz, sizeof(double));
-    if (ret == NULL)
-    {
-        printf("Malloc failed for ret ...\n");
-        exit(1);
-    }
+    double * ret = NULL;
+    all_zeroes_memory_allocation(double ,nz, ret);
 
     for (int i = 0; i < M; i++)
     {
@@ -148,12 +140,8 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
     unsigned long sum_nz = 0;
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
 
-    int *ret = (int *)calloc(nz, sizeof(int));
-    if (ret == NULL)
-    {
-        printf("Malloc failed for ret ...");
-        exit(1);
-    }
+    int * ret = NULL;
+    all_zeroes_memory_allocation(int ,nz, ret);
 
     for (int i = 0; i < M; i++)
     {
@@ -180,12 +168,9 @@ int *compute_sum_nz(int M, int *nz_per_row)
 
     printf("Computing sum_nz\n");
 
-    int *ret = (int *)calloc(M, sizeof(int));
-    if (ret == NULL)
-    {
-        printf("Malloc failed for ret ...");
-        exit(1);
-    }
+    int * ret = NULL;
+    all_zeroes_memory_allocation(int ,M, ret);
+
     ret[1] = nz_per_row[0];
     for (int i = 2; i < M; i++)
     {
@@ -228,12 +213,9 @@ double* transpose(int N, int K, double **A)
     double *ret = NULL;
 
     printf ("Computing transpose for X ...\n");
-
-    ret = (double*)malloc(sizeof(double)*N*K);
-    if (ret == NULL){
-        printf("Malloc failed for ret ...");
-        exit(1);
-    }
+ 
+    all_zeroes_memory_allocation(double ,N*K, ret);
+    
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < K; j++)

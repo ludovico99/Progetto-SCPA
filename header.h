@@ -20,6 +20,54 @@
     #include "ellpack_header.h"
 #endif
 
+#ifdef CUDA
+
+#define memory_allocation(tipo, dimensione, puntatore) \
+    puntatore = (tipo*)malloc(sizeof(tipo) * dimensione); \
+    if (puntatore == NULL) { \
+        fprintf(stderr, "Errore nell'allocazione di memoria con malloc.\n"); \
+        perror("Errore Malloc: ");                                          \
+        exit(1); \
+    } \
+
+#define all_zeroes_memory_allocation(tipo, dimensione, puntatore) \
+    puntatore = (tipo*)calloc(dimensione , sizeof(tipo)); \
+    if (puntatore == NULL) { \
+        fprintf(stderr, "Errore nell'allocazione di memoria con calloc.\n"); \
+        perror("Errore Malloc: ");  \
+        exit(1); \
+    } \
+
+#define memory_allocation_Cuda(tipo, dimensione, puntatore) \
+    err = cudaMalloc((void **)&puntatore, dimensione * sizeof(tipo)); \
+    if (err != cudaSuccess) { \
+        fprintf(stderr, "Failed to allocate device memory (error code %s)!\n", cudaGetErrorString(err));\
+        exit(1);\
+    }\
+
+    #define memcpy_to_dev(source, destination, tipo, dimensione) \
+    err = cudaMemcpy(destination, source, dimensione * sizeof(tipo), cudaMemcpyHostToDevice);\
+    if (err != cudaSuccess){ \
+        fprintf(stderr, "Failed to copy as from host to device (error code %s)!\n", cudaGetErrorString(err)); \
+        exit(1);\
+    }\
+
+    #define memcpy_to_host(source, destination, tipo, dimensione) \
+    err = cudaMemcpy(destination, source, dimensione * sizeof(tipo), cudaMemcpyDeviceToHost);\
+    if (err != cudaSuccess){ \
+        fprintf(stderr, "Failed to copy as from device to host (error code %s)!\n", cudaGetErrorString(err)); \
+        exit(1);\
+    }\
+
+    #define free_memory_Cuda(puntatore) \
+    err = cudaFree(puntatore); \
+    if (err != cudaSuccess) {   \
+        fprintf(stderr, "Failed to free device memory (error code %s)!\n",  cudaGetErrorString(err));\
+        exit(1);\
+    }\
+   
+#endif
+
 #define BILLION 1000000000L
 
 

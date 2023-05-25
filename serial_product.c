@@ -17,26 +17,16 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
     double partial_sum = 0.0;
 
     AUDIT printf("Computing serial product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+
+    memory_allocation(double *, M, y);
+
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
+
     AUDIT printf("y correctly allocated ... \n");
 
     // calcola il prodotto matrice - multi-vettore
@@ -52,12 +42,10 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
 
         for (int z = 0; z < K; z++)
         {
-            if (i == 0 && irp[i] == -1)
-            {
-                AUDIT printf("Row 0 is the vector zero\n");
-                y[i][z] = 0.0;
-            }
-            if (i > 0 && irp[i] == irp[i - 1])
+            int start = irp[i];
+            int end = irp[i + 1];
+
+            if (i < M - 1 && start == end)
             {
                 AUDIT printf("Row %d is the vector zero\n", i);
                 y[i][z] = 0.0;
@@ -65,8 +53,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
             else
             {
                 double partial_sum = 0.0;
-                int start = irp[i];
-                int end = irp[i + 1];
+                
 
                 for (int j = start; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j++)
                 {
@@ -104,25 +91,14 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
     struct timespec start, stop;
 
     AUDIT printf("Computing serial product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+
+    memory_allocation(double *, M, y);
+
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
@@ -183,26 +159,15 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
     struct timespec start, stop;
 
     AUDIT printf("Computing serial product ...\n");
-    y = (double **)malloc(M * sizeof(double *));
-    if (y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
+
+    memory_allocation(double *, M, y);
 
     for (int i = 0; i < M; i++)
-    {
-        y[i] = (double *)malloc(K * sizeof(double));
-        if (y[i] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-        for (int z = 0; z < K; z++)
-        {
-            y[i][z] = 0.0;
-        }
+    {   
+        all_zeroes_memory_allocation(double, K, y[i]);
+
     }
+
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
     if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
@@ -216,7 +181,6 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
 
         for (int z = 0; z < K; z++)
         {
-            // AUDIT printf("Computing y[%d][%d]\n", i, z);
             if (nz_per_row[i] == 0)
             {
                 y[i][z] = 0.0;

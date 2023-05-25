@@ -9,14 +9,14 @@
 
 #include "header.h"
 
-int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
+int coo_to_ellpack_serial(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
 {
     int i, j, k;
     int max_nz_per_row = 0;
 
     // Calcola il massimo numero di elementi non nulli in una riga
     printf("ELLPACK serial started...\n");
-    for (int i = 0; i < rows; i++)
+    for (int i = 0; i < M; i++)
     {
         int nz_in_row = 0;
         for (int j = 0; j < nz; j++)
@@ -33,44 +33,25 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
     // Alloca memoria per gli array ELLPACK
     if (val != NULL)
     {
-        *values = (double **)malloc(rows * sizeof(double *));
-        if (*values == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
-
-        for (int k = 0; k < rows; k++)
-        {
-            (*values)[k] = (double *)malloc(max_nz_per_row * sizeof(double));
-            if ((*values)[k] == NULL)
-            {
-                printf("Errore malloc\n");
-                exit(1);
-            }
+        memory_allocation(double * , M , *values);
+     
+        for (int k = 0; k < M; k++)
+        {   
+            memory_allocation(double , max_nz_per_row , (*values)[k]);
         }
     }
 
-    (*col_indices) = (int **)malloc(rows * sizeof(int *));
-    if ((*col_indices) == NULL)
+    memory_allocation(int * , M , *col_indices);
+  
+    for (int k = 0; k < M; k++)
     {
-        printf("Errore malloc\n");
-        exit(1);
-    }
-    for (k = 0; k < rows; k++)
-    {
-        (*col_indices)[k] = (int *)malloc(max_nz_per_row * sizeof(int));
-        if ((*col_indices)[k] == NULL)
-        {
-            printf("Errore malloc\n");
-            exit(1);
-        }
+        memory_allocation(int , max_nz_per_row ,(*col_indices)[k]);
     }
 
     printf("Malloc for ELLPACK data structures completed\n");
 
     // Riempie gli array ELLPACK con i valori e gli indici di colonna corrispondenti
-    for (int i = 0; i < rows; i++)
+    for (int i = 0; i < M; i++)
     {
         int offset = 0;
         for (int j = 0; j < nz; j++)
@@ -94,14 +75,6 @@ int coo_to_ellpack_serial(int rows, int columns, int nz, int *I, int *J, double 
         printf("row %d completed\n", i);
     }
 
-    //   for (int j = 0; j < rows; j++)
-    // {
-    //     for(int k = 0; k < max_nz_per_row; k++)
-    //     {
-    //         AUDIT printf("ELLPACK VALUE: %.66lf - COL: %d\n", (*values)[j][k], (*col_indices)[j][k]);
-    //     }
-    // }
-
     printf("Freeing COO data structures...\n");
     if (I != NULL) free(I);
     if (J != NULL) free(J);
@@ -116,13 +89,8 @@ void coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
     int chunk_size = 0;
 
     printf("Starting serial CSR conversion ...\n");
-    nz_per_row = (int *)calloc(M, sizeof(int));
 
-    if (nz_per_row == NULL)
-    {
-        printf("Errore malloc per nz_per_row\n");
-        exit(1);
-    }
+    all_zeroes_memory_allocation(int, M, nz_per_row);
 
     printf("Counting number of non-zero entries in each row...\n");
 
@@ -134,43 +102,22 @@ void coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
     printf("Allocating memory ...\n");
     // Alloca memoria per gli array CSR
     if (val != NULL)
-    {
-        *as = (double *)malloc(nz * sizeof(double));
-        if (*as == NULL)
-        {
-            printf("Errore malloc per as\n");
-            exit(1);
-        }
+    {   
+        memory_allocation(double, nz , *as );
     }
 
-    *ja = (int *)malloc(nz * sizeof(int));
-    if (*ja == NULL)
-    {
-        printf("Errore malloc per ja\n");
-        exit(1);
-    }
+    memory_allocation(int, nz , *ja );
 
-    *irp = (int *)malloc(M * sizeof(int));
-    if (*irp == NULL)
-    {
-        printf("Errore malloc per ja\n");
-        exit(1);
-    }
-
+    memory_allocation(int, M , *irp );
     memset(*irp, -1, sizeof(int) * M);
 
     printf("Filling CSR data structure ... \n");
     // Riempie gli array CSR
 
-    if (nz_per_row[0] == 0) {
-        (*irp)[0] = -1;
-        (*irp)[1] = 0;
-    }
-    else  {
-        (*irp)[0] = 0;
-        (*irp)[1] = (*irp)[0] + nz_per_row[0]; 
-    }
-    for (int i = 1; i < M - 1; i++)
+  
+    (*irp)[0] = 0;
+    
+    for (int i = 0; i < M - 1; i++)
     {    
         (*irp)[i + 1] = (*irp)[i] + nz_per_row[i];
     }
@@ -190,18 +137,12 @@ void coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
         (*irp)[row]++;
     }
     
-
      // Reset row pointers
     for (int i = M - 1; i > 0; i--) {
         (*irp)[i] = (*irp)[i-1];
     }
-    
-    if (nz_per_row[0] == 0) {
-        (*irp)[0] = -1;
-        (*irp)[1] = 0;
-    }
-    else 
-        (*irp)[0] = 0;
+
+    (*irp)[0] = 0;
     
     if (nz_per_row != NULL) free(nz_per_row);
 

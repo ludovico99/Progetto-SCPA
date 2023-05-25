@@ -45,25 +45,15 @@ void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **v
 
     printf("total not zero: %d\n", *nz);
 
-    *I = (int *)calloc(*nz, sizeof(int));
-    *J = (int *)calloc(*nz, sizeof(int));
+    all_zeroes_memory_allocation(int, *nz, *I);
+    all_zeroes_memory_allocation(int, *nz, *J);
 
-    if (*I == NULL || *J == NULL)
-    {
-        printf("Malloc Failed...\n");
-        exit(1);
-    }
 
     if (mode == GENERAL_PATTERN)
         *val = NULL;
     else
-    {
-        *val = (double *)malloc(*nz * sizeof(double));
-        if (*val == NULL)
-        {
-            printf("Malloc Failed...\n");
-            exit(1);
-        }
+    {   
+        memory_allocation(double, *nz, *val);
     }
 
     chunk_size = compute_chunk_size(*nz, nthread);
@@ -178,25 +168,14 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
 
     f = init_stream();
 
-    *I = (int *)calloc(computed_nz, sizeof(int));
-    *J = (int *)calloc(computed_nz, sizeof(int));
-
-    if (*I == NULL || *J == NULL)
-    {
-        printf("Malloc Failed...\n");
-        exit(1);
-    }
+    all_zeroes_memory_allocation(int, *nz, *I);
+    all_zeroes_memory_allocation(int, *nz, *J);
 
     if (mode == SYMM_PATTERN)
         *val = NULL;
     else
     {
-        *val = (double *)malloc(computed_nz * sizeof(double));
-        if (*val == NULL)
-        {
-            printf("Malloc Failed...\n");
-            exit(1);
-        }
+        memory_allocation(double, *nz, *val);
     }
 
     int counter = 0;

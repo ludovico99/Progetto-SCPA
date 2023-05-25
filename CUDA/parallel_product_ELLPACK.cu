@@ -8,6 +8,7 @@
 #include <cuda_runtime.h> // For CUDA runtime API
 #include <helper_cuda.h>  // For checkCudaError macro
 #include <helper_timer.h> // For CUDA SDK timers
+
 #include "../header.h"
 
 __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int * sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, int numElements)
@@ -63,122 +64,37 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     h_X = convert_2D_to_1D(M, K, X);
 
-    h_y = (double *)malloc(M * K * sizeof(double));
-    if (h_y == NULL)
-    {
-        printf("Errore malloc per y\n");
-        exit(1);
-    }
-
+    memory_allocation(double, M *K, h_y);
+ 
     h_values = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, values);
     h_col_indices = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, col_indices);
 
     printf("Allocating device variables for CPU ELLPACK product ...\n");
+    /* Allocazione su Device per la matrice Y */
+    memory_allocation_Cuda(double, M *K, d_y);
+    /* Allocazione su Device per la matrice densa X */
+    memory_allocation_Cuda(double, N * K, d_X);
 
-    err = cudaMalloc((void **)&d_y, M * K * sizeof(double));
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device y (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    memory_allocation_Cuda(double, nz, d_values);
 
-    err = cudaMalloc((void **)&d_X, N * K * sizeof(double));
+    memory_allocation_Cuda(int, nz, d_col_indices);
 
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device X (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    memory_allocation_Cuda(int, M, d_nz_per_row);
 
-    err = cudaMalloc((void **)&d_values, nz * sizeof(double));
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device values (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMalloc((void **)&d_col_indices, nz * sizeof(int));
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device col_indices (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMalloc((void **)&d_nz_per_row, M * sizeof(int));
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device nz_per_row (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMalloc((void **)&d_sum_nz, M * sizeof(int));
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to allocate device sum_mz (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    memory_allocation_Cuda(int, M, d_sum_nz);
 
     // Copy the host input vectors A and B in host memory to the device input
     // vectors in device memory
+
     printf("Copy input data from the host memory to the CUDA device\n");
 
-    err = cudaMemcpy(d_values, h_values, nz * sizeof(double), cudaMemcpyHostToDevice);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy values from host to device (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMemcpy(d_col_indices, h_col_indices, nz * sizeof(int), cudaMemcpyHostToDevice);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy ja from host to device (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMemcpy(d_X, h_X, N * K * sizeof(double), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy matrix X from host to device (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaMemcpy(d_nz_per_row, nz_per_row, M * sizeof(int), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy nz_per_row from host to device (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
+    memcpy_to_dev(h_values, d_values, double, nz);
+    memcpy_to_dev(h_col_indices, d_col_indices, int, nz);
+    memcpy_to_dev(h_X, d_X, double, N * K );
+    memcpy_to_dev(nz_per_row, d_nz_per_row, int, M);
+    
     h_sum_nz = compute_sum_nz(M, nz_per_row);
-    err = cudaMemcpy(d_sum_nz, h_sum_nz, M * sizeof(int), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy device sum_nz from host to device (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    memcpy_to_dev(h_sum_nz, d_sum_nz, int, M);
 
     // Launch the Vector Add CUDA Kernel
     int numElements = M * K;
@@ -217,70 +133,18 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     // Copy the device result vector in device memory to the host result vector
     // in host memory.
     printf("Copy output data from the CUDA device to the host memory\n");
-    err = cudaMemcpy(h_y, d_y, M * K * sizeof(double), cudaMemcpyDeviceToHost);
 
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr,
-                "Failed to copy vector C from device to host (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+     /* Copio la matrice prodotto Y dal Device all'Host */
+    memcpy_to_host(d_y, h_y, double, M *K);
 
+    printf("Freeing Device memory ...\n");
     // Free device global memory
-    err = cudaFree(d_values);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device values(error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaFree(d_col_indices);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device col_indices(error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaFree(d_nz_per_row);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device nz_per_row(error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaFree(d_X);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device matrix X (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaFree(d_y);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device matrix y (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
-    err = cudaFree(d_sum_nz);
-
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to free device sum_nz (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
+    free_memory_Cuda(d_values);
+    free_memory_Cuda(d_col_indices);
+    free_memory_Cuda(d_nz_per_row);
+    free_memory_Cuda(d_sum_nz);
+    free_memory_Cuda(d_X);
+    free_memory_Cuda(d_y);
 
     // Free host memory
     printf("Freeing host memory ...\n");
