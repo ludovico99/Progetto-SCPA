@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
-
+#include <time.h>
 
 #ifdef CORRECTNESS
 #define AUDIT if (1)
@@ -19,8 +19,6 @@
 #elif ELLPACK
     #include "ellpack_header.h"
 #endif
-
-#ifdef CUDA
 
 #define memory_allocation(tipo, dimensione, puntatore) \
     puntatore = (tipo*)malloc(sizeof(tipo) * dimensione); \
@@ -37,6 +35,9 @@
         perror("Errore Malloc: ");  \
         exit(1); \
     } \
+
+
+#ifdef CUDA
 
 #define memory_allocation_Cuda(tipo, dimensione, puntatore) \
     err = cudaMalloc((void **)&puntatore, dimensione * sizeof(tipo)); \
@@ -86,7 +87,7 @@ extern void free_y(int, double **);
 extern void print_y (int, int, double **);
 extern void print_y_GPU (int, int, double *);
 extern double* transpose(int, int, double **);
-
+extern void get_time (struct timespec *);
 
 extern char *filename;
 extern FILE *f;

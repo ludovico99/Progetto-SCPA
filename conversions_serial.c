@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#include "header.h"
+#include "include/header.h"
 
 int coo_to_ellpack_serial(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices)
 {

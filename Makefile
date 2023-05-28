@@ -1,7 +1,9 @@
+binDir=./bin
+objectsDir=./obj
+
 #------------------------------------------------------------------------- CUDA ---------------------------------------------------------------------------------------------------------
 cudaPath=/usr/local/cuda_save_11.2
 CC = 75
-binDir=./bin
 
 COMPILER_CPP=-x c++ -O3 --compiler-options -fpermissive
 COMPILER_CUDA=-x cu
@@ -22,39 +24,41 @@ endif
 
 all: build
 
-build: app
+build: $(binDir)/app
 
-main.o: main.c
+$(objectsDir)/main.o: main.c
+	mkdir -p $(objectsDir)
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-mmio.o: ./lib/mmio.c
+$(objectsDir)/mmio.o: ./lib/mmio.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-conversions_parallel.o: conversions_parallel.c
+$(objectsDir)/conversions_parallel.o: conversions_parallel.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-conversions_serial.o: conversions_serial.c
+$(objectsDir)/conversions_serial.o: conversions_serial.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-parallel_product_csr.o: ./CUDA/parallel_product_CSR.cu
+$(objectsDir)/parallel_product_CSR.o: ./CUDA/parallel_product_CSR.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
-parallel_product_ellpack.o: ./CUDA/parallel_product_ELLPACK.cu
+$(objectsDir)/parallel_product_ELLPACK.o: ./CUDA/parallel_product_ELLPACK.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
-serial_product.o: serial_product.c
+$(objectsDir)/serial_product.o: serial_product.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-utils.o: utils.c
+$(objectsDir)/utils.o: utils.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-checks.o: checks.c
+$(objectsDir)/checks.o: checks.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-create_mtx_coo.o: create_mtx_coo.c
+$(objectsDir)/create_mtx_coo.o: create_mtx_coo.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-app: main.o mmio.o conversions_parallel.o parallel_product_csr.o parallel_product_ellpack.o serial_product.o utils.o create_mtx_coo.o
+$(binDir)/app: $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o
+	mkdir -p $(binDir)
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
 
 #------------------------------------------------------------------------- OPENMP ---------------------------------------------------------------------------------------------------------
@@ -62,60 +66,68 @@ app: main.o mmio.o conversions_parallel.o parallel_product_csr.o parallel_produc
 SOURCES= conversions_parallel.c conversions_serial.c openMP/parallel_product.c serial_product.c lib/mmio.c main.c utils.c create_mtx_coo.c
 
 openmp-csr-compare-serial-parallel:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o $(binDir)/app
 
 openmp-ellpack-compare-serial-parallel:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o $(binDir)/app
 
 openmp-csr-check-conversions:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  $(SOURCES) checks.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCHECK_CONVERSION  $(SOURCES) checks.c -o $(binDir)/app
 
 openmp-ellpack-check-conversions:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION $(SOURCES) checks.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCHECK_CONVERSION $(SOURCES) checks.c -o $(binDir)/app
 
 openmp-csr-serial-samplings:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o $(binDir)/app
 
 openmp-csr-parallel-samplings:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
 
 openmp-ellpack-serial-samplings:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
 
 openmp-ellpack-parallel-samplings:
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o app
+	mkdir -p $(binDir)
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
 
 #------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
 
 matrice_prova:
-	./app Matrici/prova.mtx 
+	$(binDir)/app Matrici/prova.mtx 
 
 adder-dcop-32:
-	./app Matrici/adder_dcop_32/adder_dcop_32.mtx 
+	$(binDir)/app Matrici/adder_dcop_32/adder_dcop_32.mtx 
 
 PR02R:
-	./app Matrici/PR02R/PR02R.mtx 
+	$(binDir)/app Matrici/PR02R/PR02R.mtx 
 
 dc1:
-	./app Matrici/dc1/dc1.mtx 
+	$(binDir)/app Matrici/dc1/dc1.mtx 
 
 raefsky2:
-	./app Matrici/raefsky2/raefsky2.mtx 
+	$(binDir)/app Matrici/raefsky2/raefsky2.mtx 
 
 mhd4800a:
-	./app Matrici/mhd4800a/mhd4800a.mtx 
+	$(binDir)/app Matrici/mhd4800a/mhd4800a.mtx 
 
 bcsstk17:
-	./app Matrici/bcsstk17/bcsstk17.mtx 
+	$(binDir)/app Matrici/bcsstk17/bcsstk17.mtx 
 
 amazon0302:
-	./app Matrici/amazon0302/amazon0302.mtx 
+	$(binDir)/app Matrici/amazon0302/amazon0302.mtx 
 
 Cube_Coup_dt0:
-	./app Matrici/Cube_Coup_dt0/Cube_Coup_dt0.mtx 
+	$(binDir)/app Matrici/Cube_Coup_dt0/Cube_Coup_dt0.mtx 
 
 ML_Laplace:
-	./app Matrici/ML_Laplace/ML_Laplace.mtx 
+	$(binDir)/app Matrici/ML_Laplace/ML_Laplace.mtx 
 
 #------------------------------------------------------------------------- DEBUG SCRIPTS ---------------------------------------------------------------------------------------------------------
 
@@ -128,8 +140,8 @@ print_elem_by_row:
 #------------------------------------------------------------------------- CLEAN ---------------------------------------------------------------------------------------------------------
 
 clean:
+	rm -rf $(objectsDir) $(binDir)
 	rm -f *.o
-	rm app
 
 
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------

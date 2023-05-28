@@ -9,7 +9,7 @@
 #include <helper_cuda.h>  // For checkCudaError macro
 #include <helper_timer.h> // For CUDA SDK timers
 
-#include "../header.h"
+#include "../include/header.h"
 
 __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int * sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, int numElements)
 {

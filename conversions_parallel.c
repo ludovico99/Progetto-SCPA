@@ -7,8 +7,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-
-#include "header.h"
+#include "include/header.h"
 
 int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices, int nthread)
 {
@@ -409,8 +408,8 @@ int *coo_to_ellpack_no_zero_padding_parallel_optimization(int M, int N, int nz, 
 
     chunk_size = compute_chunk_size(nz, nthread);
 
-    all_zeroes_memory_allocation(int, M, curr_idx_per_row )
-    all_zeroes_memory_allocation(int, M, nz_per_row )
+    all_zeroes_memory_allocation(int, M, curr_idx_per_row );
+    all_zeroes_memory_allocation(int, M, nz_per_row );
 
 #pragma omp parallel for schedule(static, chunk_size) shared(I, nz, chunk_size, nz_per_row) num_threads(nthread) default(none)
     // Calcola il numero di elementi non nulli per riga

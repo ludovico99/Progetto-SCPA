@@ -8,7 +8,7 @@
 #include <cuda_runtime.h> // For CUDA runtime API
 #include <helper_cuda.h>  // For checkCudaError macro
 #include <helper_timer.h> // For CUDA SDK timers
-#include "../header.h"
+#include "../include/header.h"
 
 /*
  * CSR_kernel_v1 - Implementazione del prodotto tra matrice sparsa A e matrice densa X

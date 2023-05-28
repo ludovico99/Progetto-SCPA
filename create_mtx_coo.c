@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include "lib/mmio.h"
-#include "header.h"
+#include "include/header.h"
 
 static FILE *init_stream(void)
 {

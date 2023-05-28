@@ -4,10 +4,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <time.h>
 #include <stdio.h>
 
-#include "../header.h"
+#include "../include/header.h"
 
 double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, int *irp, double **X, double *time, int nthread)
 {
@@ -20,11 +19,9 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
 
     memory_allocation(double *, M, y);
 
-
     for (int i = 0; i < M; i++)
-    {   
+    {
         all_zeroes_memory_allocation(double, K, y[i]);
-
     }
 
     AUDIT printf("y correctly allocated ... \n");
@@ -32,45 +29,98 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
     chunk_size = compute_chunk_size(M, nthread);
 
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
 
-#pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, as, ja, irp, X, M, K, nz, nthread, chunk_size) default(none)
-    for (int i = 0; i < M; i++)
+    if (as == NULL)
     {
-        for (int z = 0; z < K; z++)
+
+        get_time(&start);
+
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(y, as, ja, irp, X, M, K, nz, nthread, chunk_size) default(none)
+        for (int i = 0; i < M; i++)
         {
             int start = irp[i];
             int end = irp[i + 1];
 
-            if (i < M - 1 && start == end)
+            if (i < M - 1)
             {
-                AUDIT printf("Row %d is the vector zero\n", i);
-                y[i][z] = 0.0;
+                for (int z = 0; z < K; z++)
+                {
+
+                    double partial_sum = 0.0;
+
+                    for (int j = start; j < end; j++)
+                    {
+                        partial_sum += 1.0 * X[ja[j]][z];
+                    }
+
+                    y[i][z] = partial_sum;
+                }
             }
             else
             {
-                double partial_sum = 0.0;
-                for (int j = start; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j++)
+                for (int z = 0; z < K; z++)
                 {
-                    if (as != NULL)
+
+                    double partial_sum = 0.0;
+
+                    for (int j = start; j < nz; j++)
+                    {
                         partial_sum += as[j] * X[ja[j]][z];
-                    else
-                        partial_sum += 1.0 * X[ja[j]][z];
+                    }
+
+                    y[i][z] = partial_sum;
                 }
-                y[i][z] = partial_sum;
             }
         }
+
+        get_time(&stop);
+    }
+    else
+    {
+
+        get_time(&start);
+
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(y, as, ja, irp, X, M, K, nz, nthread, chunk_size) default(none)
+        for (int i = 0; i < M; i++)
+        {
+            int start = irp[i];
+            int end = irp[i + 1];
+
+            if (i < M - 1)
+            {
+                for (int z = 0; z < K; z++)
+                {
+
+                    double partial_sum = 0.0;
+
+                    for (int j = start; j < end; j++)
+                    {
+                        partial_sum += as[j] * X[ja[j]][z];
+                    }
+
+                    y[i][z] = partial_sum;
+                }
+            }
+            else
+            {
+                for (int z = 0; z < K; z++)
+                {
+
+                    double partial_sum = 0.0;
+
+                    for (int j = start; j < nz; j++)
+                    {
+                        partial_sum += as[j] * X[ja[j]][z];
+                    }
+
+                    y[i][z] = partial_sum;
+                }
+            }
+        }
+
+        get_time(&stop);
     }
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
     AUDIT printf("Completed parallel product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
@@ -91,14 +141,12 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
     int chunk_size = 0;
 
     AUDIT printf("Computing parallel product ...\n");
-    
+
     memory_allocation(double *, M, y);
 
-
     for (int i = 0; i < M; i++)
-    {   
+    {
         all_zeroes_memory_allocation(double, K, y[i]);
-
     }
 
     AUDIT printf("y correctly allocated ... \n");
@@ -106,11 +154,7 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
 
     chunk_size = compute_chunk_size(M, nthread);
 
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&start);
 
 #pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, K, max_nz_per_row, as, X, ja, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
@@ -143,11 +187,8 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
         }
     }
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&stop);
+
     AUDIT printf("Completed parallel product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
@@ -171,22 +212,16 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
 
     memory_allocation(double *, M, y);
 
-
     for (int i = 0; i < M; i++)
-    {   
-        all_zeroes_memory_allocation(double, K, y[i]);
-
-    }
-    
-    AUDIT printf("y correctly allocated ... \n");
-    // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
     {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
+        all_zeroes_memory_allocation(double, K, y[i]);
     }
 
     chunk_size = compute_chunk_size(M, nthread);
+
+    AUDIT printf("y correctly allocated ... \n");
+    // calcola il prodotto matrice - multi-vettore
+    get_time(&start);
 
 #pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, K, nz_per_row, as, X, ja, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
@@ -211,18 +246,14 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
             }
         }
     }
-    // AUDIT printf("Completed parallel product ...\n");
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&stop);
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     if (time != NULL)
         *time = accum;
 
+    AUDIT printf("Completed parallel product ...\n");
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
     AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 

@@ -9,7 +9,7 @@
 #include <math.h>
 
 #include "lib/mmio.h"
-#include "header.h"
+#include "include/header.h"
 
 #define SAMPLING_SIZE 30
 

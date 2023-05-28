@@ -1,4 +1,4 @@
-#include "header.h"
+#include "include/header.h"
 #include "lib/mmio.h"
 #include "stdlib.h"
 
@@ -225,4 +225,14 @@ double* transpose(int N, int K, double **A)
     }
 
     return ret;
+}
+
+void get_time (struct timespec *time){
+
+   if (clock_gettime(CLOCK_MONOTONIC, time) == -1)
+    {
+        perror("Errore clock()");
+        exit(EXIT_FAILURE);
+    }
+
 }

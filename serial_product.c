@@ -7,7 +7,7 @@
 #include <fcntl.h>
 #include <time.h>
 
-#include "header.h"
+#include "include/header.h"
 
 double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, int *irp, double **X, double *time)
 {
@@ -30,12 +30,8 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
     AUDIT printf("y correctly allocated ... \n");
 
     // calcola il prodotto matrice - multi-vettore
-
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    
+    get_time(&start);
 
     for (int i = 0; i < M; i++)
     {
@@ -67,11 +63,8 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
         }
     }
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&stop);
+
     AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
@@ -102,11 +95,7 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
     }
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&start);
 
     for (int i = 0; i < M; i++)
     {
@@ -135,11 +124,8 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
         }
     }
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&stop);
+
     AUDIT printf("Completed serial product ...\n");
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
@@ -170,11 +156,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
 
     AUDIT printf("y correctly allocated ... \n");
     // calcola il prodotto matrice - multi-vettore
-    if (clock_gettime(CLOCK_MONOTONIC, &start) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+    get_time(&start);
 
     for (int i = 0; i < M; i++)
     {
@@ -197,11 +179,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
     }
     AUDIT printf("Completed serial product ...\n");
 
-    if (clock_gettime(CLOCK_MONOTONIC, &stop) == -1)
-    {
-        perror("Errore clock()");
-        exit(EXIT_FAILURE);
-    }
+   get_time(&stop);
 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     if (time != NULL)

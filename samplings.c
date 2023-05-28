@@ -4,7 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "header.h"
+#include "include/header.h"
 
 static double calculate_mean(double x, double mean, int n)
 {
@@ -26,8 +26,8 @@ static double calculate_variance(double x, double mean, double variance, int n)
 
 #ifdef CSR
 void computing_samplings_openMP(int M, int N, int *K, int nz, double *as, int *ja, int *irp, int max_nthread)
-#elif ELLPACK 
-void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, double ** values, int **col_indices, int max_nthread)
+#elif ELLPACK
+void computing_samplings_openMP(int M, int N, int *K, int nz, int *nz_per_row, double **values, int **col_indices, int max_nthread)
 #endif
 {
 
@@ -45,13 +45,13 @@ void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, 
 #ifdef SAMPLING_SERIAL
 #ifdef ELLPACK
 
-    fn = "samplings_serial_ELLPACK.csv";
+    fn = "plots/samplings_serial_ELLPACK.csv";
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,mean,variance\n");
 
 #elif CSR
 
-    fn = "samplings_serial_CSR.csv";
+    fn = "plots/samplings_serial_CSR.csv";
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,mean,variance\n");
 
@@ -61,11 +61,11 @@ void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, 
 // SAMPLING FOR THE PARALLEL PRODUCT
 #ifdef SAMPLING_PARALLEL
 #ifdef ELLPACK
-    fn = "samplings_parallel_ELLPACK.csv";
+    fn = "plots/samplings_parallel_ELLPACK.csv";
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,num_threads,mean,variance\n");
 #elif CSR
-    fn = "samplings_parallel_CSR.csv";
+    fn = "plots/samplings_parallel_CSR.csv";
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,num_threads,mean,variance\n");
 #endif
@@ -87,10 +87,10 @@ void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, 
             {
 #ifdef ELLPACK
 #ifdef SAMPLING_PARALLEL
-                y = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time, num_thread);
+                y = parallel_product_ellpack_no_zero_padding(M, N, K[k], nz, nz_per_row, values, col_indices, X, &time, num_thread);
 
 #elif SAMPLING_SERIAL
-                y = serial_product_ellpack_no_zero_padding(M, N, K[k], nz_per_row, values, col_indices, X, &time);
+                y = serial_product_ellpack_no_zero_padding(M, N, K[k], nz, nz_per_row, values, col_indices, X, &time);
 #endif
 
 #elif CSR
@@ -105,7 +105,7 @@ void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, 
                 variance = calculate_variance(time, mean, variance, curr_samp + 1);
                 Gflops = calculate_mean(compute_GFLOPS(K[k], nz, time * 1e9), Gflops, curr_samp + 1);
 
-                free_y (M, y);
+                free_y(M, y);
             }
 
 #ifdef SAMPLING_PARALLEL
@@ -120,7 +120,6 @@ void computing_samplings_openMP(int M, int N, int *K, int nz,  int *nz_per_row, 
 #endif
         free_X(M, X);
     }
-
 
     if (f_samplings != stdin)
         fclose(f_samplings);
