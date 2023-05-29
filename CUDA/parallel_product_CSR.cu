@@ -11,17 +11,17 @@
 #include "../include/header.h"
 
 /**
- * CSR_kernel_v1 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
+ * CSR_kernel_v1 -  Product implementation between sparse matrix A and dense matrix X
  *
- *@M: Numero di righe
- *@K: Numero di colonne
- *@nz: Numero di elementi non zero della matrice sparsa
- *@d_as: Vettore contenente gli elementi non zero della matrice sparsa
- *@d_ja: Vettore contenente gli indici di colonna degli elementi non zero della matrice sparsa
- *@d_irp: Vettore contenente l'indice di colonna del primo non zero delle righe
- *@d_X: Matrice densa
- *@d_y: Matrice prodotto
- *@numElements: Numero di elementi della matrice prodotto Y
+ *@param M: Number of rows of the matrix A
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param d_y: Resulting matrix
+ *@param numElements: Number of elements of the product matrix Y
  *
  * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
  * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
@@ -31,13 +31,13 @@
  */
 __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-    /* Identificativo del thread */
+     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    /* Riga dell'elemento che il thread deve computare */
+    /* Row of the item that the thread should compute */
     int i = tid / K;
 
-    /* Colonna dell'elemento che il thread deve computare */
+    /* Item column that the thread should compute */
     int z = tid % K;
 
     if (tid < numElements)
@@ -64,17 +64,17 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
 }
 
 /**
- * CSR_kernel_v2 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
+ * CSR_kernel_v2 - Product implementation between sparse matrix A and dense matrix X
  *
- *@M: Numero di righe
- *@K: Numero di colonne
- *@nz: Numero di elementi non zero della matrice sparsa
- *@d_as: Vettore contenente gli elementi non zero della matrice sparsa
- *@d_ja: Vettore contenente gli indici di colonna degli elementi non zero della matrice sparsa
- *@d_irp: Vettore contenente l'indice di colonna del primo non zero delle righe
- *@d_X: Matrice densa
- *@d_y: Matrice prodotto
- *@numElements: Numero di elementi della matrice prodotto Y
+ *@param M: Number of rows of the matrix A
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param d_y: Resulting matrix
+ *@param numElements: Number of elements of the product matrix Y
  *
  * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
  * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
@@ -84,16 +84,16 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
  */
 __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-    /* Identificativo del thread */
+   /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    /* Riga dell'elemento che il thread deve computare */
+    /* Row of the item that the thread should compute */
     int i = tid / K;
 
-    /* Colonna dell'elemento che il thread deve computare */
+    /* Item column that the thread should compute */
     int z = tid % K;
 
-    /* Risultato parziale dell'elemento della matrice Y */
+    /* Partial result of matrix element Y */
     double partial_sum = 0;
 
     if (tid < numElements)
@@ -123,17 +123,17 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
 }
 
 /**
- * CSR_kernel_v3 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
+ * CSR_kernel_v3 - Product implementation between sparse matrix A and dense matrix X
  *
- *@M: Numero di righe
- *@K: Numero di colonne
- *@nz: Numero di elementi non zero della matrice sparsa
- *@d_as: Vettore contenente gli elementi non zero della matrice sparsa
- *@d_ja: Vettore contenente gli indici di colonna degli elementi non zero della matrice sparsa
- *@d_irp: Vettore contenente l'indice di colonna del primo non zero delle righe
- *@d_X: Matrice densa
- *@d_y: Matrice prodotto
- *@numElements: Numero di elementi della matrice prodotto Y
+ *@param M: Number of rows of the matrix A
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param d_y: Resulting matrix
+ *@param numElements: Number of elements of the product matrix Y
  *
  * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
  * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
@@ -142,16 +142,16 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
  */
 __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-    /* Identificativo del thread */
+   /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    /* Riga dell'elemento che il thread deve computare */
+    /* Row of the item that the thread should compute */
     int i = tid / K;
 
-    /* Colonna dell'elemento che il thread deve computare */
+    /* Item column that the thread should compute */
     int z = tid % K;
 
-    /* Risultato parziale dell'elemento della matrice Y */
+    /* Partial result of matrix element Y */
     double partial_sum = 0;
 
     if (tid < numElements)
@@ -182,26 +182,39 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
     }
 }
 
-/*
- * Questa funzione esegue dei setup per poter lanciare
- * il kernel:
+/**
  *
- *   1. La matrice densa X viene convertita da 2D
- *      a 1D.
+ * CSR_GPU - This function performs setups to launch the kernel:
+ * 
+ *   1. Dense matrix X is converted from 2D to 1D.
  *
- *   2. Viene eseguita l'allocazione di memoria per la
- *      la matrice Y.
+ *   2. Memory allocation is performed for the Y matrix.
  *
- *   3. Viene allocata la memoria su Device.
+ *   3. Memory is allocated to Device.
  *
- *   4. Il contenuto delle strutture dati viene copiato
- *      dall'Host verso il Device.
+ *   4. The contents of data structures are copied from the Host to the Device.
  *
- *   5. Viene lanciato il kernel.
+ *   5. The kernel is launched.
  *
+ *   6. The result is acquired from device
+ *
+ *   7. Memory allocated on both devices and hosts is released
+ *
+ *@param M: Number of rows of the matrix A
+ *@param N: Number of columns of the matrix A, Number of rows of the matrix X
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param h_as: Vector containing the non-zero elements of the sparse array
+ *@param h_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param h_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param time: Pointer to a double representing the time elapsed for the GPU product
+ *
+ * Returns the resulting/product matrix computed by the GPU kernel
  */
+
 double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp, double **X, double *time)
-{   
+{
     cudaError_t err = cudaSuccess;
     cudaEvent_t start, stop;
     cudaStream_t stream = NULL;
@@ -219,43 +232,43 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     float expireTimeMsec = 0.0;
 
-    /* Conversione matrice densa X da 2D a 1D */
+    /* 2D to 1D dense matrix X conversion*/
     h_X = convert_2D_to_1D(M, K, X);
 
-    /* Allocazione memoria host della matrice Y */
+    /* Y array host memory allocation */
     memory_allocation(double, M *K, h_y);
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
-    /* Allocazione su Device per la matrice Y */
+   /* Y array host memory allocation */
     memory_allocation_Cuda(double, M *K, d_y);
-    /* Allocazione su Device per la matrice densa X */
+     /* Device allocation for dense matrix X */
     memory_allocation_Cuda(double, N *K, d_X);
-    /* Allocazione su Device per il vettore as contenente gli elementi non zero */
+    /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(double, nz, d_as);
-    /* Allocazione su Device per il vettore ja contenente gli indici di colonna */
+    /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(int, nz, d_ja);
-    /* Allocazione su Device per il vettore irp contenente il puntatore alla entry del vettore ja */
+    /* Device allocation for the irp vector containing the pointer to the vector entry ja */
     memory_allocation_Cuda(int, M, d_irp);
 
     printf("Copy input data from the host memory to the CUDA device\n");
 
-    /* Copio il contenuto del vettore as dall'Host verso il Device */
+    /* Copy of the contents of the vector as from the Host to the Device */
     memcpy_to_dev(h_as, d_as, double, nz);
-    /* Copio il contenuto del vettore ja dall'Host verso il Device */
+    /* Copy of the contents of the vector ja from the Host to the Device */
     memcpy_to_dev(h_ja, d_ja, int, nz);
-    /* Copio il contenuto del vettore irp dall'Host verso il Device */
+    /* Copy of the contents of the vector irp from the Host to the Devicee */
     memcpy_to_dev(h_irp, d_irp, int, M);
-    /* Copio la matrice densa X dall'Host verso il Device */
+    /* Copy of the dense vector X from the Host to the Device*/
     memcpy_to_dev(h_X, d_X, double, N *K);
 
-    /* Numero di elementi della matrice prodotto Y */
+    /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
-    /* Numero di thread per blocco */
+    /* Number of threads per block */
     int threadsPerBlock = 1024;
 
-    /* Numero di blocchi per griglia */
+    /* Number of blocks per grid */
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
@@ -294,10 +307,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Copy output data from the CUDA device to the host memory\n");
 
-    /* Copio la matrice prodotto Y dal Device all'Host */
+    /* Copy of the product matrix Y from the Device to the Host */
     memcpy_to_host(d_y, h_y, double, M *K);
 
-    /* Inizio il processo di pulizia della memoria su Device */
+    /* Start the memory cleaning process on Device */
     printf("Freeing Device memory ...\n");
 
     free_memory_Cuda(d_as);
@@ -306,7 +319,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     free_memory_Cuda(d_X);
     free_memory_Cuda(d_y);
 
-    /* Inizio il processo di pulizia della memoria su Host */
+    /* Start the memory cleaning process on Host */
 
     printf("Freeing host memory ...\n");
 
@@ -316,4 +329,3 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     return h_y;
 }
-
