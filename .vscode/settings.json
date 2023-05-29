@@ -17,7 +17,11 @@
         "string_view": "cpp",
         "initializer_list": "cpp",
         "stat.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "cmath": "c",
+        "ellpack_header.h": "c",
+        "cuda_header.h": "c",
+        "openmp_header.h": "c"
     },
     "cmake.sourceDirectory": "/home/ludovico99/Scrivania/Progetto-SCPA/CUDA",
     "C_Cpp.errorSquiggles": "disabled"

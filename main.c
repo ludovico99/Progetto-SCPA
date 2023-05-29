@@ -16,33 +16,48 @@
 char *filename = NULL;
 FILE *f = NULL;
 
-/*
- * Il parametro mode identifica la tipologia di matrice
- * che si vuole utilizzare.
+/**
+ * create_matrix_coo - It reads from the file and allocates the matrix in the COO format
+ * @mode: It's a code that represents a matrix type in our application
+ * @M: Number of rows
+ * @N: Number of columns
+ * @nz: Number of nz
+ * @I: Array of integers that contains the row indexes
+ * @J: Array of integers that contains the column indexes
+ * @val: Array of double containing the values
  */
-void create_matrix_coo(int mode, int *M, int *N, int *nz, int **I, int **J, double **val, int nthread)
+
+static void create_matrix_coo(int mode, int *M, int *N, int *nz, int **I, int **J, double **val)
 {
     switch (mode)
     {
     case SYMM_PATTERN:
-        coo_symm(mode, M, N, nz, I, J, val, nthread);
+        coo_symm(mode, M, N, nz, I, J, val);
         break;
 
     case SYMM_REAL:
-        coo_symm(mode, M, N, nz, I, J, val, nthread);
+        coo_symm(mode, M, N, nz, I, J, val);
         break;
 
     case GENERAL_PATTERN:
-        coo_general(mode, M, N, nz, I, J, val, nthread);
+        coo_general(mode, M, N, nz, I, J, val);
         break;
 
     case GENERAL_REAL:
-        coo_general(mode, M, N, nz, I, J, val, nthread);
+        coo_general(mode, M, N, nz, I, J, val);
         break;
     }
 }
 
-int check_matcode_error(MM_typecode matcode)
+/**
+ * check_matcode_error - Auxiliary function that checks if the matrix in input is supported by this application
+ *
+ * @matcode: Array that represents the type of the matrix
+ *
+ * Returns 1 if the matrix is not supported, otherwise returns 0
+ */
+
+static int check_matcode_error(MM_typecode matcode)
 {
     /*  This is how one can screen matrix types if their application */
     /*  only supports a subset of the Matrix Market data types.      */
@@ -63,25 +78,6 @@ int check_matcode_error(MM_typecode matcode)
     return 0;
 }
 
-void create_dense_matrix(int N, int K, double *** X)
-{
-
-    AUDIT printf("Creating dense matrix ...\n");
-    memory_allocation(double *, N, *X);
-
-    for (int j = 0; j < N; j++)
-    {   
-        memory_allocation(double, K, (*X)[j] );
-    
-        for (int z = 0; z < K; z++)
-        {
-            (*X)[j][z] = 1.0;
-        }
-    }
-
-    AUDIT printf("Completed dense matrix creation...\n");
-}
-
 int main(int argc, char *argv[])
 {
     int nthread;
@@ -90,21 +86,23 @@ int main(int argc, char *argv[])
     int N;
     int nz;
 
-    // COO MATRIX
+    // Declaring variables for COO matrix representation
     int *I;
     int *J;
     double *val;
+
     double **y_serial;
 
 #ifdef ELLPACK
+    // Declaring variables for ELLPACK matrix representation
     double **values;
     int **col_indices;
 
     int *nz_per_row = NULL;
 
-#endif
+#elif CSR
 
-#ifdef CSR
+    // Declaring variables for CSR matrix representation
     double *as;
     int *ja;
     int *irp;
@@ -112,22 +110,23 @@ int main(int argc, char *argv[])
 
 #ifdef CUDA
     double *y_parallel_cuda;
-#endif
-
-#ifdef OPENMP
+#elif OPENMP
     double **y_parallel_omp;
 #endif
-
+    /*
+     * The dense matrix is a two-dimensional array represented as an array of pointers to rows,
+     * where each pointer points to an array of doubles representing the columns of that specific row.
+     */
     double **X;
     MM_typecode matcode;
 
 #ifdef SAMPLINGS
     int K[] = {3, 4, 8, 12, 16, 32, 64};
 #endif
-
+    // nthread is the number of processors available to the device.
     nthread = omp_get_num_procs();
 
-    if (argc < 2)
+    if (argc < 2) // The code needs at least 2 parameters: the executable and the name of the matrix
     {
         fprintf(stderr, "Usage: %s [matrix-market-filename]\n", argv[0]);
         exit(1);
@@ -135,17 +134,17 @@ int main(int argc, char *argv[])
 
     filename = argv[1];
 
-    if ((f = fopen(filename, "r")) == NULL)
+    if ((f = fopen(filename, "r")) == NULL) // Opening the matrix as described in the .mtx file format
     {
         printf("Error opening the file\n");
         exit(1);
     }
 
     /*
-     * Determinare il tipo di matrice rappresentata nel file Matrix Marker.
-     * Il File Descriptor f si assume essere stato aperto per l'accesso in
-     * lettura.
+     * Determine the type of matrix represented in the Matrix Marker file.
+     * File Descriptor f is assumed to have been opened for read access.
      */
+
     if (mm_read_banner(f, &matcode) != 0)
     {
         printf("Could not process Matrix Market banner.\n");
@@ -156,21 +155,27 @@ int main(int argc, char *argv[])
         exit(1);
 
     /*
-     * Verifico se la matrice è simmetrica.
+     * Verify that the matrix is symmetric.
      */
     if (mm_is_symmetric(matcode))
     {
         /*
-         * Verifico se la matrice simmetrica è pattern.
+         * Verify that the symmetric matrix is pattern.
          */
         if (mm_is_pattern(matcode))
         {
-            create_matrix_coo(SYMM_PATTERN, &M, &N, &nz, &I, &J, &val, nthread);
+            create_matrix_coo(SYMM_PATTERN, &M, &N, &nz, &I, &J, &val);
         }
+        /*
+         * Verify that the symmetric matrix is real.
+         */
         else if (mm_is_real(matcode))
         {
-            create_matrix_coo(SYMM_REAL, &M, &N, &nz, &I, &J, &val, nthread);
+            create_matrix_coo(SYMM_REAL, &M, &N, &nz, &I, &J, &val);
         }
+        /*
+         * Otherwise the symmetric matrix is not supported by the application
+         */
         else
         {
             printf("Sorry, this application does not support ");
@@ -178,17 +183,27 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
+    /*
+     * Verify that the matrix is general.
+     */
     else if (mm_is_general(matcode))
-    {
+    { /*
+       * Verify that the general matrix is pattern.
+       */
         if (mm_is_pattern(matcode))
         {
-            create_matrix_coo(GENERAL_PATTERN, &M, &N, &nz, &I, &J, &val, nthread);
+            create_matrix_coo(GENERAL_PATTERN, &M, &N, &nz, &I, &J, &val);
         }
-
+        /*
+         * Verify that the general matrix is real.
+         */
         else if (mm_is_real(matcode))
         {
-            create_matrix_coo(GENERAL_REAL, &M, &N, &nz, &I, &J, &val, nthread);
+            create_matrix_coo(GENERAL_REAL, &M, &N, &nz, &I, &J, &val);
         }
+        /*
+         * Otherwise the symmetric matrix is not supported by the application
+         */
         else
         {
             printf("Sorry, this application does not support ");
@@ -196,6 +211,9 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
+    /*
+     * Otherwise the matrix is not supported by the application
+     */
     else
     {
         printf("Sorry, this application does not support ");
@@ -206,7 +224,9 @@ int main(int argc, char *argv[])
 #ifdef ELLPACK
 
 #ifdef CHECK_CONVERSION
-
+    /**
+     * Let's compare the optimized conversion for ELLPACK with the normal one. The optimized one is much faster respect to the normal one.
+     */
     cmp_conversation = compare_conversion_algorithms_ellpack(M, N, nz, I, J, val, nthread);
 
     if (f != stdin)
@@ -219,23 +239,23 @@ int main(int argc, char *argv[])
 
 #else // NOT CHECK_CONVERSION
 
-    /* Questa versione per la conversione di Ellpack memorizza i byte 0x00 di padding */
-    //int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
+    /* This conversion version of Ellpack stores 0x00 bytes of padding */
+    // int max_nz_per_row = coo_to_ellpack_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
-    /* Questa versione per la conversione di Ellpack non memorizza i byte 0x00 di padding */
+    /* This conversion version of Ellpack does not store 0x00 bytes of padding */
     // nz_per_row = coo_to_ellpack_no_zero_padding_parallel(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
-    /* Questa versione per la conversione di Ellpack ottimizza la versione che non usa il padding */
+    /* This conversion version of Ellpack optimizes the version that doesn't use padding*/
     nz_per_row = coo_to_ellpack_no_zero_padding_parallel_optimization(M, N, nz, I, J, val, &values, &col_indices, nthread);
 
 #endif // CHECK_CONVERSION
 
-#endif // ELLPACK
-
-#ifdef CSR
+#elif CSR
 
 #ifdef CHECK_CONVERSION
-
+    /**
+     * Let's compare the optimized conversion for CSR with the normal one. The optimized one is much faster respect to the normal one.
+     */
     cmp_conversation = compare_conversion_algorithms_csr(M, N, nz, I, J, val, nthread);
 
     if (f != stdin)
@@ -248,21 +268,26 @@ int main(int argc, char *argv[])
 
 #else // NOT CHECK_CONVERSION
 
+    /* Standard conversion from COO to CSR format*/
     // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A, nthread);
+
+    /* This conversion version of CSR optimizes the previous version*/
     coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp, nthread);
 
 #endif // CHECK_CONVERSION
-
-#endif // CSR
+#endif
 
 #ifdef SAMPLINGS
-
+    /**
+     * Let's compute for a fixed number of samplings, the mean and the variance of the times as the number of threads and K vary.
+     *  The computed stats are written in a .csv in the plots directory
+     */
 #ifdef OPENMP
-    #ifdef CSR
-        computing_samplings_openMP(M, N, K, nz, as, ja, irp, nthread);
-    #elif ELLPACK
-        computing_samplings_openMP(M, N, K, nz, nz_per_row, values, col_indices, nthread);
-    #endif
+#ifdef CSR
+    computing_samplings_openMP(M, N, K, nz, as, ja, irp, nthread);
+#elif ELLPACK
+    computing_samplings_openMP(M, N, K, nz, nz_per_row, values, col_indices, nthread);
+#endif
 #endif
 
 #ifdef CUDA
@@ -270,60 +295,61 @@ int main(int argc, char *argv[])
 #endif // CUDA
 
     if (f != stdin)
-    fclose(f);
+        fclose(f);
     return 0;
-    
+
 #endif // SAMPLINGS
 
-
 #ifdef CORRECTNESS
-
-    int k = 64;
-    create_dense_matrix(N, k, &X);
+    /**
+     * With CORRECTNESS defined, we wants to verify that the serial product is equal to the parallel one within a tolerance range.
+     */
+    int K = 64;
+    create_dense_matrix(N, K, &X);
 
 #ifdef ELLPACK
-     /* Questa versione per il prodotto seriale utilizza la conversione ELLPACK con i byte 0x00 di padding */
-    //y_serial = serial_product_ellpack(M, N, k, nz, max_nz_per_row, values, col_indices, X, NULL);
+    /* This version for the serial product uses ELLPACK conversion with 0x00 bytes of padding */
+    // y_serial = serial_product_ellpack(M, N, K, nz, max_nz_per_row, values, col_indices, X, NULL);
 
-     /* Questa versione per il prodotto seriale utilizza la conversione ELLPACK senza i byte 0x00 di padding */
-    y_serial = serial_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL);
+    /* This version for the serial product uses the ELLPACK conversion without the 0x00 bytes of padding*/
+    y_serial = serial_product_ellpack_no_zero_padding(M, N, K, nz, nz_per_row, values, col_indices, X, NULL);
 
 #ifdef OPENMP
-     /* Questa versione per il prodotto parallelo utilizza la conversione ELLPACK con i byte 0x00 di padding */
-    //y_parallel_omp = parallel_product_ellpack (M, N, k, nz, max_nz_per_row, values, col_indices, X, NULL, nthread);
+    /* This parallel product version uses ELLPACK conversion with 0x00 bytes of padding*/
+    // y_parallel_omp = parallel_product_ellpack (M, N, K, nz, max_nz_per_row, values, col_indices, X, NULL, nthread);
 
-     /* Questa versione per il prodotto parallelo utilizza la conversione ELLPACK senza i byte 0x00 di padding */
-    y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, k, nz, nz_per_row, values, col_indices, X, NULL, nthread);
+    /* This version for the parallel product uses the ELLPACK conversion without the 0x00 bytes of padding*/
+    y_parallel_omp = parallel_product_ellpack_no_zero_padding(M, N, K, nz, nz_per_row, values, col_indices, X, NULL, nthread);
 
     free_X(N, X);
     free_ELLPACK_data_structures(M, values, col_indices);
-    
+
+#elif CUDA
+    /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
+    y_parallel_cuda = ELLPACK_GPU(M, N, K, nz, nz_per_row, values, col_indices, X, NULL);
+
+    /*The allocated memory is freed in the previous invokation*/
 #endif
 
-#ifdef CUDA
+    /* Freeing the array nz_per_row */
+    if (nz_per_row != NULL)
+        free(nz_per_row);
 
-    y_parallel_cuda = ELLPACK_GPU(M, N, k, nz, nz_per_row, values, col_indices, X, NULL);
+#elif CSR
 
-#endif
-
-   if (nz_per_row != NULL) free (nz_per_row);
-    
-#endif // ELLPACK
-
-#ifdef CSR
-
-    y_serial = serial_product_CSR(M, N, k, nz, as, ja, irp, X, NULL);
+    /* Invoking serial product for CSR format */
+    y_serial = serial_product_CSR(M, N, K, nz, as, ja, irp, X, NULL);
 
 #ifdef OPENMP
-    y_parallel_omp = parallel_product_CSR(M, N, k, nz, as, ja, irp, X, NULL, nthread);
+    /* Invoking parallel product for CSR format */
+    y_parallel_omp = parallel_product_CSR(M, N, K, nz, as, ja, irp, X, NULL, nthread);
 
     free_X(N, X);
 
-#endif // OPENMP
+#elif CUDA
 
-#ifdef CUDA
-
-    y_parallel_cuda = CSR_GPU(M, N, k, nz, as, ja, irp, X, NULL);
+    /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
+    y_parallel_cuda = CSR_GPU(M, N, K, nz, as, ja, irp, X, NULL);
 
 #endif // CUDA
 
@@ -331,34 +357,20 @@ int main(int argc, char *argv[])
 
 #endif // CSR
 
-    for (int i = 0; i < M; i++)
-    {
-        for (int z = 0; z < k; z++)
-        {
-
-#ifdef CUDA
-            if (y_serial[i][z] != y_parallel_cuda[i * k + z])
-#endif
+        /**
+         * Checking the results: Let's see if the computed products are equal or not.
+         * For double precision, the unit roundoff is approximately 2.220446049250313e-16.
+         */
 
 #ifdef OPENMP
-                if (y_serial[i][z] != y_parallel_omp[i][z])
-#endif
-                {
-                    printf("Serial result is different ...\n");
-                    exit(0);
-                }
-        }
-    }
-    printf("Same results...\n");
-
-    printf("Freeing matrix y...\n");
-    free_y(M, y_serial);
-#ifdef OPENMP
+    check_correctness(M, K, y_serial, y_parallel_omp);
     free_y(M, y_parallel_omp);
-#endif
-#ifdef CUDA
+#elif CUDA
+    check_correctness(M, K, y_serial, y_parallel_cuda);
     free(y_parallel_cuda);
 #endif
+
+    free_y(M, y_serial);
 
 #endif // CORRECTNESS
 

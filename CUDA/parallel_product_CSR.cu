@@ -10,7 +10,7 @@
 #include <helper_timer.h> // For CUDA SDK timers
 #include "../include/header.h"
 
-/*
+/**
  * CSR_kernel_v1 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
  *
  *@M: Numero di righe
@@ -63,7 +63,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
     }
 }
 
-/*
+/**
  * CSR_kernel_v2 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
  *
  *@M: Numero di righe
@@ -122,7 +122,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
     }
 }
 
-/*
+/**
  * CSR_kernel_v3 - Implementazione del prodotto tra matrice sparsa A e matrice densa X
  *
  *@M: Numero di righe
@@ -316,3 +316,4 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     return h_y;
 }
+

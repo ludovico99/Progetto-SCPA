@@ -2,6 +2,26 @@
 #include "lib/mmio.h"
 #include "stdlib.h"
 
+
+void create_dense_matrix(int N, int K, double ***X)
+{
+
+    AUDIT printf("Creating dense matrix ...\n");
+    memory_allocation(double *, N, *X);
+
+    for (int j = 0; j < N; j++)
+    {
+        memory_allocation(double, K, (*X)[j]);
+
+        for (int z = 0; z < K; z++)
+        {
+            (*X)[j][z] = 1.0;
+        }
+    }
+
+    AUDIT printf("Completed dense matrix creation...\n");
+}
+
 /* Computazione della dimensione del chunk per parallelizzare */
 int compute_chunk_size(int value, int nthread)
 {

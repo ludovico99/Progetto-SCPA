@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "header.h"
+#include "include/header.h"
+#include <math.h>
+
+#define TOLLERANZA 2.22e-16
 
 #ifdef ELLPACK
 int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, double *val, int nthread)
@@ -157,3 +160,51 @@ int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, doub
     return 0;
 }
 #endif
+
+#ifdef OPENMP
+void check_correctness(int M, int K, double ** y_serial, double ** y_parallel)
+#elif CUDA
+void check_correctness(int M, int K, double ** y_serial, double * y_parallel)
+#endif
+{
+    int flag = 1;
+    double abs_err;
+    double rel_err;
+    double max_abs;
+    for (int i = 0; i < M; i++)
+    {
+        for (int z = 0; z < K; z++)
+        {
+
+#ifdef CUDA
+            max_abs = MAX(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
+            abs_err = fabs(y_serial[i][z] - y_parallel[i * K + z]);
+            rel_err = abs_err / max_abs;
+#elif OPENMP
+            max_abs = MAX(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
+            abs_err = fabs(y_serial[i][z] - y_parallel[i][z]);
+            rel_err = abs_err / max_abs;
+#endif
+
+            if (abs_err > TOLLERANZA || abs_err > TOLLERANZA)
+            {
+                flag = 0;
+                break;
+            }
+        }
+
+        if (!flag)
+        {
+            break;
+        }
+    }
+
+    if (flag)
+    {
+        printf("I due prodotti matrice-matrice sono uguali.\n");
+    }
+    else
+    {
+        printf("I due prodotti matrice-matrice sono differenti.\n");
+    }
+}

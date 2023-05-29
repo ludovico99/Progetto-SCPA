@@ -67,11 +67,11 @@ SOURCES= conversions_parallel.c conversions_serial.c openMP/parallel_product.c s
 
 openmp-csr-compare-serial-parallel:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -D_GNU_SOURCE -DCORRECTNESS $(SOURCES) checks.c -o $(binDir)/app
 
 openmp-ellpack-compare-serial-parallel:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -D_GNU_SOURCE -DCORRECTNESS  $(SOURCES) checks.c -o $(binDir)/app
 
 openmp-csr-check-conversions:
 	mkdir -p $(binDir)

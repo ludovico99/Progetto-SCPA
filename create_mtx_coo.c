@@ -26,7 +26,7 @@ static FILE *init_stream(void)
     return f;
 }
 
-void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **val, int nthread)
+void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **val)
 {
     int ret_code;
     int chunk_size;
@@ -55,10 +55,6 @@ void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **v
     {   
         memory_allocation(double, *nz, *val);
     }
-
-    chunk_size = compute_chunk_size(*nz, nthread);
-
-    printf("Chunk size computed: %d\n", chunk_size);
 
     if (mode == GENERAL_PATTERN)
     {
@@ -93,7 +89,7 @@ void coo_general(int mode, int *M, int *N, int *nz, int **I, int **J, double **v
 }
 
 /* La variabile type permette di discriminare real e pattern */
-void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val, int nthread)
+void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val)
 {
     int ret_code;
     int computed_nz;
@@ -121,8 +117,6 @@ void coo_symm(int mode, int *M, int *N, int *nz, int **I, int **J, double **val,
     printf("Initial nz for a symmetric matrix: %d\n", *nz);
 
     computed_nz = *nz * 2;
-
-    chunk_size = compute_chunk_size(*nz, nthread);
 
     /*
      * Sottraggo al doppio del numero di non zeri (diagonale
