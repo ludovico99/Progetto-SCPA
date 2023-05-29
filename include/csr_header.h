@@ -11,7 +11,7 @@ extern int compare_conversion_algorithms_csr(int, int, int, int *, int *, double
 #endif
 
 // CONVERSION CSR
-extern void coo_to_CSR_serial(int, int, int, int *, int *, double *, double **, int **, int **);
+extern int *coo_to_CSR_serial(int, int, int, int *, int *, double *, double **, int **, int **);
 extern int *coo_to_CSR_parallel(int, int, int, int *, int *, double *, double **, int **, int **, int);
 extern int *coo_to_CSR_parallel_optimization(int, int, int, int *, int *, double *, double **, int **, int **, int);
 

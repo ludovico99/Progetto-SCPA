@@ -18,13 +18,13 @@ FILE *f = NULL;
 
 /**
  * create_matrix_coo - It reads from the file and allocates the matrix in the COO format
- * @mode: It's a code that represents a matrix type in our application
- * @M: Number of rows
- * @N: Number of columns
- * @nz: Number of nz
- * @I: Array of integers that contains the row indexes
- * @J: Array of integers that contains the column indexes
- * @val: Array of double containing the values
+ * @param mode: It's a code that represents a matrix type in our application
+ * @param M: Number of rows
+ * @param N: Number of columns
+ * @param nz: Number of nz
+ * @param I: Array of integers that contains the row indexes for each number not zero
+ * @param J: Array of integers that contains the column indexes for each number not zero
+ * @param val: Array of double containing the values for each number not zero
  */
 
 static void create_matrix_coo(int mode, int *M, int *N, int *nz, int **I, int **J, double **val)
@@ -52,7 +52,7 @@ static void create_matrix_coo(int mode, int *M, int *N, int *nz, int **I, int **
 /**
  * check_matcode_error - Auxiliary function that checks if the matrix in input is supported by this application
  *
- * @matcode: Array that represents the type of the matrix
+ * @param matcode: Array that represents the type of the matrix
  *
  * Returns 1 if the matrix is not supported, otherwise returns 0
  */
