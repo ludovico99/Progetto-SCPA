@@ -177,11 +177,11 @@ void check_correctness(int M, int K, double ** y_serial, double * y_parallel)
         {
 
 #ifdef CUDA
-            max_abs = MAX(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
+            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i * K + z]);
             rel_err = abs_err / max_abs;
 #elif OPENMP
-            max_abs = MAX(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
+            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i][z]);
             rel_err = abs_err / max_abs;
 #endif

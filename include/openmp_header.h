@@ -9,7 +9,6 @@ extern double **parallel_product_ellpack_no_zero_padding(int, int, int, int, int
 extern void free_ELLPACK_data_structures(int, double **, int **);
 #elif CSR
 extern double **parallel_product_CSR(int, int, int, int, double *, int *, int *, double **, double *, int);
-extern void free_CSR_data_structures(double *, int *, int *);
 #endif
 
 extern void free_X(int, double **);

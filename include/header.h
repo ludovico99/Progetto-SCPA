@@ -25,7 +25,7 @@
 #include "cuda_header.h"
 #endif
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define memory_allocation(tipo, dimensione, puntatore)                       \
     puntatore = (tipo *)malloc(sizeof(tipo) * dimensione);                   \
@@ -59,6 +59,7 @@ extern void coo_general(int, int *, int *, int *, int **, int **, double **);
 extern void coo_symm(int, int *, int *, int *, int **, int **, double **);
 extern void create_dense_matrix(int, int, double ***);
 extern void free_y(int, double **);
+extern void free_CSR_data_structures(double *, int *, int *);
 extern void print_y(int, int, double **);
 extern void print_y_GPU(int, int, double *);
 extern double *transpose(int, int, double **);

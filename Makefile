@@ -57,7 +57,7 @@ $(objectsDir)/checks.o: checks.c
 $(objectsDir)/create_mtx_coo.o: create_mtx_coo.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-$(binDir)/app: $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o
+$(binDir)/app: $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o $(objectsDir)/checks.o
 	mkdir -p $(binDir)
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
 
