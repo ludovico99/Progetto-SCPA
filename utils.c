@@ -33,7 +33,7 @@ void create_dense_matrix(int N, int K, double ***X)
  * compute_chunk_size - Computation of the size of the chunk to be assigned to each thread
  * @param value: Iteration space dimension
  * @param nthread: number of processors available to the device.
- * 
+ *
  * Returns the value chunk size computed
  */
 
@@ -46,17 +46,17 @@ int compute_chunk_size(int value, int nthread)
     else
         chunk_size = value / nthread + 1;
     /*
-* 16 is equal to the number of integers in a cache line.
-      * It is also a multiple of 8, which is the number of doubles in a cache line.
+     * 16 is equal to the number of integers in a cache line.
+     * It is also a multiple of 8, which is the number of doubles in a cache line.
      */
-    chunk_size = chunk_size - chunk_size % (16); // It is the integer closest to the chunk size multiple of 16.
+    if (chunk_size > 16) chunk_size = chunk_size - chunk_size % (16); // It is the integer closest to the chunk size multiple of 16.
     return chunk_size;
 }
 
 /**
  * compute_GFLOPS - Computing the GLOPS
  * @param k: Number of columns of the dense matrix
- * @param nz: Number of nz 
+ * @param nz: Number of nz
  * @param time: time in nano-secons
  * Returns the computed GLOPS value
  */
@@ -162,9 +162,9 @@ void free_y(int M, double **y)
  */
 
 double *convert_2D_to_1D(int M, int K, double **A)
-{   
-    double * ret = NULL;
-    all_zeroes_memory_allocation(double, M*K, ret);
+{
+    double *ret = NULL;
+    all_zeroes_memory_allocation(double, M *K, ret);
 
     printf("Starting 2D conversion in 1D\n");
     for (int i = 0; i < M; i++)
@@ -197,8 +197,8 @@ double *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, doubl
 
     unsigned long sum_nz = 0;
 
-    double * ret = NULL;
-    all_zeroes_memory_allocation(double ,nz, ret);
+    double *ret = NULL;
+    all_zeroes_memory_allocation(double, nz, ret);
 
     for (int i = 0; i < M; i++)
     {
@@ -231,8 +231,8 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
     unsigned long sum_nz = 0;
     printf("Starting 2D conversion in 1D for a ragged matrix\n");
 
-    int * ret = NULL;
-    all_zeroes_memory_allocation(int ,nz, ret);
+    int *ret = NULL;
+    all_zeroes_memory_allocation(int, nz, ret);
 
     for (int i = 0; i < M; i++)
     {
@@ -258,7 +258,7 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
  * compute_sum_nz - Function that computes, for the i-th row, the sum of non-zeroes up to the i-th row
  * @param M: Number of rows
  * @param nz_per_row: Array of number of non-zero per row
- * 
+ *
  * Returns an array that represents the number of non-zeroes up to the i-th row
  */
 
@@ -267,8 +267,8 @@ int *compute_sum_nz(int M, int *nz_per_row)
 
     printf("Computing sum_nz\n");
 
-    int * ret = NULL;
-    all_zeroes_memory_allocation(int ,M, ret);
+    int *ret = NULL;
+    all_zeroes_memory_allocation(int, M, ret);
 
     ret[1] = nz_per_row[0];
     for (int i = 2; i < M; i++)
@@ -283,7 +283,7 @@ int *compute_sum_nz(int M, int *nz_per_row)
  * @param M: Number of rows
  * @param K: Number of non-zeroes
  * @param y: Matrix to be printed
- * 
+ *
  */
 
 void print_y(int M, int K, double **y)
@@ -305,7 +305,7 @@ void print_y(int M, int K, double **y)
  * @param M: Number of rows
  * @param K: Number of non-zeroes
  * @param y: Matrix to be printed
- * 
+ *
  */
 
 void print_y_GPU(int M, int K, double *y)
@@ -328,17 +328,17 @@ void print_y_GPU(int M, int K, double *y)
  * @param N: Number of rows
  * @param K: Number of non-zeroes
  * @param A: Matrix to be transposed
- * 
+ *
  */
 
-double* transpose(int N, int K, double **A)
-{   
+double *transpose(int N, int K, double **A)
+{
     double *ret = NULL;
 
-    printf ("Computing transpose for X ...\n");
- 
-    all_zeroes_memory_allocation(double ,N*K, ret);
-    
+    printf("Computing transpose for X ...\n");
+
+    all_zeroes_memory_allocation(double, N *K, ret);
+
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < K; j++)
@@ -353,15 +353,15 @@ double* transpose(int N, int K, double **A)
 /**
  * get_time - It computes the time elapsed since the start of the program
  * @param time: pointer to the struct timespec
- * 
+ *
  */
 
-void get_time (struct timespec *time){
+void get_time(struct timespec *time)
+{
 
-   if (clock_gettime(CLOCK_MONOTONIC, time) == -1)
+    if (clock_gettime(CLOCK_MONOTONIC, time) == -1)
     {
         perror("Errore clock()");
         exit(EXIT_FAILURE);
     }
-
 }

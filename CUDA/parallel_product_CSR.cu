@@ -212,7 +212,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
             end = nz;
 
         vals[threadIdx.x] = 0.0;
-        
+
         for (int j = start + tid_within_warp; j < end; j += 32)
         {
             if (d_as != NULL)
@@ -395,6 +395,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Freeing host memory ...\n");
 
+    print_y_GPU(M, K, h_y);
+    
     free(h_X);
     printf("Completed parallel product CSR without streams...\n");
 

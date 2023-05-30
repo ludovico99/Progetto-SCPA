@@ -174,7 +174,7 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
     /**
      * Computing the number of not zero for each row
      */
-#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, I, nz, nz_per_row, stdout) default(none)
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(chunk_size, I, nz, nz_per_row) default(none)
 
     for (int i = 0; i < nz; i++)
     {
