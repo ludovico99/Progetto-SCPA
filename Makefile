@@ -147,7 +147,7 @@ clean:
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
 SSH_KEY = /home/${USERNAME}/.ssh/id_rsa
 
-USER = Luca
+USER = Ludovico
 
 ifeq ($(USER), Ludovico)
     DIR_SRC = /home/${USERNAME}/Scrivania/Progetto-SCPA

@@ -9,6 +9,8 @@
 
 #include "include/header.h"
 
+/*------------------------------------------------------- CSR ---------------------------------------------------------------------*/
+
 /**
  * serial_product_CSR - Function that implements the sparse matrix - dense vector product with A in the CSR format
  * @param M: Number of rows of the matrix A
@@ -57,30 +59,27 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
      */
     for (int i = 0; i < M; i++)
     {
+        int start = irp[i]; // Starting index for the i-th row
+        int end = 0;
+
+        if (i < M - 1)
+            end = irp[i + 1]; // Ending index for the i-th row
+        else
+            end = nz;
 
         for (int z = 0; z < K; z++)
         {
-            int start = irp[i];   // Starting index for the i-th row
-            int end = irp[i + 1]; // Ending index for the i-th row
 
-            if (i < M - 1 && start == end)
-            {
-                AUDIT printf("Row %d is the vector zero\n", i);
-                y[i][z] = 0.0;
-            }
-            else
-            {
-                double partial_sum = 0.0;
+            double partial_sum = 0.0;
 
-                for (int j = start; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j++)
-                {
-                    if (as != NULL) // A is not a pattern matrix
-                        partial_sum += as[j] * X[ja[j]][z];
-                    else
-                        partial_sum += 1.0 * X[ja[j]][z];
-                }
-                y[i][z] = partial_sum;
+            for (int j = start; j < end; j++)
+            {
+                if (as != NULL) // A is not a pattern matrix
+                    partial_sum += as[j] * X[ja[j]][z];
+                else
+                    partial_sum += 1.0 * X[ja[j]][z];
             }
+            y[i][z] = partial_sum;
         }
     }
     /**
@@ -103,6 +102,8 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
 
     return y;
 }
+
+/*------------------------------------------------------- ELLPACK ---------------------------------------------------------------------*/
 
 /**
  * serial_product_ellpack - Function that implements the sparse matrix - dense vector product with A in the ELLPACK format with 0x0 padding
@@ -130,6 +131,7 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
     /**
      * Allocating memory for the resulting matrix y
      */
+
     memory_allocation(double *, M, y);
 
     for (int i = 0; i < M; i++)
@@ -197,7 +199,7 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
 }
 
 /**
- * serial_product_ellpack - Function that implements the sparse matrix - dense vector product with A in the ELLPACK format without 0x0 padding
+ * serial_product_ellpack_no_zero_padding - Function that implements the sparse matrix - dense vector product with A in the ELLPACK format without 0x0 padding
  * @param M: Number of rows of the matrix A
  * @param N: Number of columns of the matrix A, Number of rows of the matrix X
  * @param K: Number of columns of the matrix X
@@ -210,6 +212,7 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
  *
  * Returns resulting matrix y of dimension (M * K)
  */
+
 double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int *nz_per_row, double **as, int **ja, double **X, double *time)
 {
 
@@ -263,6 +266,7 @@ double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int
     /**
      * Getting the elapsed time ssince—as described by POSIX—"some unspecified point in the past"
      */
+
     get_time(&stop);
 
     /**

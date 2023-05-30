@@ -42,11 +42,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
 
     if (tid < numElements)
     {
-        if (i == 0 && d_irp[i] == -1)
-        {
-            d_y[i * K + z] = 0.0;
-        }
-        if (i > 0 && d_irp[i] == d_irp[i - 1])
+        if (i < M - 1 && d_irp[i] == d_irp[i + 1])
         {
             d_y[i * K + z] = 0.0;
         }
@@ -99,11 +95,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
     if (tid < numElements)
     {
 
-        if (i == 0 && d_irp[i] == -1)
-        {
-            d_y[i * K + z] = 0.0;
-        }
-        else if (i > 0 && d_irp[i] == d_irp[i - 1])
+        if (i < M - 1 && d_irp[i] == d_irp[i + 1])
         {
             d_y[i * K + z] = 0.0;
         }
@@ -157,33 +149,26 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
     if (tid < numElements)
     {
         int start = d_irp[i];
-        int end = d_irp[i + 1];
+        int end = 0;
 
-        if (i == 0 && start == -1)
-        {
-            d_y[i * K + z] = 0.0;
-        }
-        else if (i > 0 && start == d_irp[i - 1])
-        {
-            d_y[i * K + z] = 0.0;
-        }
+        if (i < M - 1)
+            end = d_irp[i + 1]; // Ending index for the i-th row
         else
-        {
+            end = nz;
 
-            for (int j = start; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j++)
-            {
-                if (d_as != NULL)
-                    partial_sum += d_as[j] * d_X[d_ja[j] * K + z];
-                else
-                    partial_sum += 1.0 * d_X[d_ja[j] * K + z];
-            }
-            d_y[i * K + z] = partial_sum;
+        for (int j = start; j < end; j++)
+        {
+            if (d_as != NULL)
+                partial_sum += d_as[j] * d_X[d_ja[j] * K + z];
+            else
+                partial_sum += 1.0 * d_X[d_ja[j] * K + z];
         }
+        d_y[i * K + z] = partial_sum;
     }
 }
 
 /**
- * CSR_Vector_Kernel - Product implementation between sparse matrix A and dense matrix X
+ * CSR_Vector_Kernel - CSR vector implementation between sparse matrix A and dense matrix X
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
@@ -205,52 +190,59 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Global Warp Index */
-    int tid_warp = tid / 32;
+    int tid_warp = tid / 32; // Each warps computes an element of the matrix y
 
     /* TID Within the warp */
-    int tid_within_warp = tid & (31);
+    int tid_within_warp = tid % 32;
 
     /* Row of the item that the warp should compute */
     int i = tid_warp / K;
 
     /* Column of the item that the warp should compute */
-    // int z = tid_warp % K;
+    int z = tid_warp % K;
 
-    if (i < M)
+    if (tid_warp < numElements)
     {
         int start = d_irp[i];
-        int end = d_irp[i + 1];
+        int end = 0;
+
+        if (i < M - 1)
+            end = d_irp[i + 1]; // Ending index for the i-th row
+        else
+            end = nz;
 
         vals[threadIdx.x] = 0.0;
-
-        for (int z = 0; z < K; z++)
+        
+        for (int j = start + tid_within_warp; j < end; j += 32)
         {
-            for (int j = start + tid_within_warp; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j += 32)
-            {
-                if (d_as != NULL)
-                    vals[threadIdx.x] += d_as[j] * d_X[d_ja[j] * K + z];
-                else
-                    vals[threadIdx.x] += 1.0 * d_X[d_ja[j] * K + z];
-            }
-
-            if (tid_within_warp < 16)
-                vals[threadIdx.x] += vals[threadIdx.x + 16];
-
-            if (tid_within_warp < 8)
-                vals[threadIdx.x] += vals[threadIdx.x + 8];
-
-            if (tid_within_warp < 4)
-                vals[threadIdx.x] += vals[threadIdx.x + 4];
-
-            if (tid_within_warp < 2)
-                vals[threadIdx.x] += vals[threadIdx.x + 2];
-
-            if (tid_within_warp < 1)
-                vals[threadIdx.x] += vals[threadIdx.x + 1];
-
-            if (tid_within_warp == 0)
-                d_y[i * K + z] += vals[threadIdx.x];
+            if (d_as != NULL)
+                vals[threadIdx.x] += d_as[j] * d_X[d_ja[j] * K + z];
+            else
+                vals[threadIdx.x] += 1.0 * d_X[d_ja[j] * K + z];
         }
+
+        /**
+         * Parallel reduction in shared memory
+         */
+        if (tid_within_warp < 16)
+            vals[threadIdx.x] += vals[threadIdx.x + 16];
+
+        if (tid_within_warp < 8)
+            vals[threadIdx.x] += vals[threadIdx.x + 8];
+
+        if (tid_within_warp < 4)
+            vals[threadIdx.x] += vals[threadIdx.x + 4];
+
+        if (tid_within_warp < 2)
+            vals[threadIdx.x] += vals[threadIdx.x + 2];
+
+        if (tid_within_warp < 1)
+            vals[threadIdx.x] += vals[threadIdx.x + 1];
+        /**
+         * Only the first thread writes the result
+         */
+        if (tid_within_warp == 0)
+            d_y[i * K + z] = vals[threadIdx.x];
     }
 }
 
@@ -343,7 +335,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     int warpPerBlock = threadsPerBlock / 32;
 
     /* Number of blocks per grid */
-    int blocksPerGrid = (M + warpPerBlock - 1) / warpPerBlock;
+    // int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (numElements + warpPerBlock - 1) / warpPerBlock;
 
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
            threadsPerBlock);
@@ -356,6 +349,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     /* Versione accesso alla memoria globale non ottimizzato */
     // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+
+    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
     /* Versione accesso alla memoria globale ottimizzato */
     // CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
@@ -401,7 +396,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     printf("Freeing host memory ...\n");
 
     free(h_X);
-
     printf("Completed parallel product CSR without streams...\n");
 
     return h_y;

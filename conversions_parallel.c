@@ -261,7 +261,7 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
  * @param val: Array of double containing the values for each number not zero
  * @param values: Pointer to the 2D array of coefficients
  * @param col_indices: Pointer to the 2D array of column indexes
- * @param nthread: number of processors available to the device.
+ * @param nthread: Number of processors available to the device.
  */
 
 int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, double ***values, int ***col_indices, int nthread)
