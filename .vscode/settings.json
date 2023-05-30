@@ -21,7 +21,9 @@
         "cmath": "c",
         "ellpack_header.h": "c",
         "cuda_header.h": "c",
-        "openmp_header.h": "c"
+        "openmp_header.h": "c",
+        "random": "c",
+        "limits": "c"
     },
     "cmake.sourceDirectory": "/home/ludovico99/Scrivania/Progetto-SCPA/CUDA",
     "C_Cpp.errorSquiggles": "disabled"

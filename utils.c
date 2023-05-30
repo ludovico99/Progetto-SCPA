@@ -1,7 +1,6 @@
 #include "include/header.h"
 #include "lib/mmio.h"
-#include "stdlib.h"
-
+#include <stdlib.h>
 /**
  * create_dense_matrix - Create a dense matrix (assuming the number of non-zeros is zero) of all 1.0
  * @param N: Number of rows
@@ -15,14 +14,14 @@ void create_dense_matrix(int N, int K, double ***X)
 
     AUDIT printf("Creating dense matrix ...\n");
     memory_allocation(double *, N, *X);
-
+    //srand (time(NULL));
     for (int j = 0; j < N; j++)
     {
         memory_allocation(double, K, (*X)[j]);
 
         for (int z = 0; z < K; z++)
         {
-            (*X)[j][z] = 1.0;
+            (*X)[j][z] =  (double)(rand()%10 + 1);
         }
     }
 
@@ -293,7 +292,7 @@ void print_y(int M, int K, double **y)
         printf("\n");
         for (int z = 0; z < K; z++)
         {
-            printf("y[%d][%d] = %.20lf\t", i, z, y[i][z]);
+            printf("y[%d][%d] = %.70lf\t", i, z, y[i][z]);
         }
         printf("\n");
     }

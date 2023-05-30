@@ -223,10 +223,10 @@ void check_correctness(int M, int K, double ** y_serial, double ** y_parallel)
 void check_correctness(int M, int K, double ** y_serial, double * y_parallel)
 #endif
 {
-    int flag = 1;
-    double abs_err;
-    double rel_err;
-    double max_abs;
+
+    double abs_err = 0.0;
+    double rel_err = 0.0;
+
     for (int i = 0; i < M; i++)
     {
         for (int z = 0; z < K; z++)
@@ -235,37 +235,24 @@ void check_correctness(int M, int K, double ** y_serial, double * y_parallel)
          * Computing the absolute error and relative error for each element in y
         */
 #ifdef CUDA
-            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
+            double max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i * K + z]);
 #elif OPENMP
-            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
+            double max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i][z]);
 #endif  
          if (max_abs == 0.0) max_abs = 1.0;
-         rel_err = abs_err / max_abs;
-        /**
+
+        rel_err = max(rel_err, abs_err / max_abs);
+    
+        
+        }
+    }
+     /**
          * Checking if the two resulting matrixes are equal or not. 
-         * TOLLERANZA is the IEEE unit roundoff for a double 
+         * TOLLERANZA (2.22e^-16 is the threshold) is the IEEE unit roundoff for a double 
         */
-            if (rel_err > TOLLERANZA)
-            {
-                flag = 0;
-                break;
-            }
-        }
+    printf("I due prodotti matrice-matrice hanno un max relative error pari a %.20lf (2.22e^-16 is the threshold).\n", rel_err);
 
-        if (!flag)
-        {
-            break;
-        }
-    }
-
-    if (flag)
-    {
-        printf("I due prodotti matrice-matrice sono uguali.\n");
-    }
-    else
-    {
-        printf("I due prodotti matrice-matrice sono differenti.\n");
-    }
+  
 }

@@ -189,10 +189,13 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    /* Global Warp Index */
-    int tid_warp = tid / 32; // Each warps computes an element of the matrix y
+    /**
+     *  Global Warp Index: One warp per element 
+     *  Each warps computes an element of the matrix y
+     * */
+    int tid_warp = tid / 32;
 
-    /* TID Within the warp */
+    /* Tid within the warp */
     int tid_within_warp = tid % 32;
 
     /* Row of the item that the warp should compute */
@@ -212,7 +215,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
             end = nz;
 
         vals[threadIdx.x] = 0.0;
-
+        
         for (int j = start + tid_within_warp; j < end; j += 32)
         {
             if (d_as != NULL)
@@ -224,25 +227,31 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
         /**
          * Parallel reduction in shared memory
          */
-        if (tid_within_warp < 16)
-            vals[threadIdx.x] += vals[threadIdx.x + 16];
+        // if (tid_within_warp < 16)
+        //     vals[threadIdx.x] += vals[threadIdx.x + 16];
 
-        if (tid_within_warp < 8)
-            vals[threadIdx.x] += vals[threadIdx.x + 8];
+        // if (tid_within_warp < 8)
+        //     vals[threadIdx.x] += vals[threadIdx.x + 8];
 
-        if (tid_within_warp < 4)
-            vals[threadIdx.x] += vals[threadIdx.x + 4];
+        // if (tid_within_warp < 4)
+        //     vals[threadIdx.x] += vals[threadIdx.x + 4];
 
-        if (tid_within_warp < 2)
-            vals[threadIdx.x] += vals[threadIdx.x + 2];
+        // if (tid_within_warp < 2)
+        //     vals[threadIdx.x] += vals[threadIdx.x + 2];
 
-        if (tid_within_warp < 1)
-            vals[threadIdx.x] += vals[threadIdx.x + 1];
+        // if (tid_within_warp < 1)
+        //     vals[threadIdx.x] += vals[threadIdx.x + 1];
         /**
          * Only the first thread writes the result
          */
-        if (tid_within_warp == 0)
-            d_y[i * K + z] = vals[threadIdx.x];
+        if (tid_within_warp == 0){
+            
+            for (int j = threadIdx.x; j < threadIdx.x + 32; j ++)
+            {
+                d_y[i * K + z] = vals[j];
+            }
+
+        }
     }
 }
 
@@ -335,7 +344,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     int warpPerBlock = threadsPerBlock / 32;
 
     /* Number of blocks per grid */
-    // int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    //int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
     int blocksPerGrid = (numElements + warpPerBlock - 1) / warpPerBlock;
 
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
@@ -348,12 +357,12 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     checkCudaErrors(cudaEventRecord(start, stream));
 
     /* Versione accesso alla memoria globale non ottimizzato */
-    // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    //CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
-    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    //CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
     /* Versione accesso alla memoria globale ottimizzato */
-    // CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    //CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
     /* CSR Vector */
     CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
@@ -395,8 +404,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Freeing host memory ...\n");
 
-    print_y_GPU(M, K, h_y);
-    
+    //print_y_GPU(M, K, h_y);
+
     free(h_X);
     printf("Completed parallel product CSR without streams...\n");
 
