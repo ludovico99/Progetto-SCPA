@@ -31,7 +31,7 @@
  */
 __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-     /* Thread identifier */
+    /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Row of the item that the thread should compute */
@@ -84,7 +84,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
  */
 __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-   /* Thread identifier */
+    /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Row of the item that the thread should compute */
@@ -142,7 +142,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
  */
 __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
-   /* Thread identifier */
+    /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Row of the item that the thread should compute */
@@ -183,9 +183,81 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
 }
 
 /**
+ * CSR_Vector_Kernel - Product implementation between sparse matrix A and dense matrix X
+ *
+ *@param M: Number of rows of the matrix A
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param d_y: Resulting matrix
+ *@param numElements: Number of elements of the product matrix Y
+ *
+ *
+ */
+__global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
+{
+    __shared__ double vals[1024];
+
+    /* Thread identifier */
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    /* Global Warp Index */
+    int tid_warp = tid / 32;
+
+    /* TID Within the warp */
+    int tid_within_warp = tid & (31);
+
+    /* Row of the item that the warp should compute */
+    int i = tid_warp / K;
+
+    /* Column of the item that the warp should compute */
+    // int z = tid_warp % K;
+
+    if (i < M)
+    {
+        int start = d_irp[i];
+        int end = d_irp[i + 1];
+
+        vals[threadIdx.x] = 0.0;
+
+        for (int z = 0; z < K; z++)
+        {
+            for (int j = start + tid_within_warp; (i < (M - 1) && j < end) || (i >= M - 1 && j < nz); j += 32)
+            {
+                if (d_as != NULL)
+                    vals[threadIdx.x] += d_as[j] * d_X[d_ja[j] * K + z];
+                else
+                    vals[threadIdx.x] += 1.0 * d_X[d_ja[j] * K + z];
+            }
+
+            if (tid_within_warp < 16)
+                vals[threadIdx.x] += vals[threadIdx.x + 16];
+
+            if (tid_within_warp < 8)
+                vals[threadIdx.x] += vals[threadIdx.x + 8];
+
+            if (tid_within_warp < 4)
+                vals[threadIdx.x] += vals[threadIdx.x + 4];
+
+            if (tid_within_warp < 2)
+                vals[threadIdx.x] += vals[threadIdx.x + 2];
+
+            if (tid_within_warp < 1)
+                vals[threadIdx.x] += vals[threadIdx.x + 1];
+
+            if (tid_within_warp == 0)
+                d_y[i * K + z] += vals[threadIdx.x];
+        }
+    }
+}
+
+/**
  *
  * CSR_GPU - This function performs setups to launch the kernel:
- * 
+ *
  *   1. Dense matrix X is converted from 2D to 1D.
  *
  *   2. Memory allocation is performed for the Y matrix.
@@ -240,9 +312,9 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
-   /* Y array host memory allocation */
+    /* Y array host memory allocation */
     memory_allocation_Cuda(double, M *K, d_y);
-     /* Device allocation for dense matrix X */
+    /* Device allocation for dense matrix X */
     memory_allocation_Cuda(double, N *K, d_X);
     /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(double, nz, d_as);
@@ -268,8 +340,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of threads per block */
     int threadsPerBlock = 1024;
 
+    int warpPerBlock = threadsPerBlock / 32;
+
     /* Number of blocks per grid */
-    int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (M + warpPerBlock - 1) / warpPerBlock;
 
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
            threadsPerBlock);
@@ -284,7 +358,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
     /* Versione accesso alla memoria globale ottimizzato */
-    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    // CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+
+    /* CSR Vector */
+    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
     err = cudaGetLastError();
     if (err != cudaSuccess)

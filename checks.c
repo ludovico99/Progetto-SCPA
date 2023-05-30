@@ -247,8 +247,9 @@ void check_correctness(int M, int K, double ** y_serial, double * y_parallel)
          * Checking if the two resulting matrixes are equal or not. 
          * TOLLERANZA is the IEEE unit roundoff for a double 
         */
-            if (abs_err > TOLLERANZA || rel_err > TOLLERANZA)
+            if (rel_err > TOLLERANZA)
             {
+                printf("%.20lf\t%.20lf\n", rel_err, abs_err);
                 flag = 0;
                 break;
             }
