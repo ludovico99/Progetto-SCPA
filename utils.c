@@ -21,7 +21,7 @@ void create_dense_matrix(int N, int K, double ***X)
 
         for (int z = 0; z < K; z++)
         {
-            (*X)[j][z] =  (double)(rand()%10 + 1);
+            (*X)[j][z] =  1.1232134;
         }
     }
 

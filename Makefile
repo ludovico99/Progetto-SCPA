@@ -14,12 +14,14 @@ OPENMP=--compiler-options -fopenmp
 INCLUDES=-I${cudaPath}/samples/common/inc
 FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 
-MODE = csr_adaptive
+MODE = csr_vector
 
 ifeq ($(MODE), csr)
     DEFINES= -DCORRECTNESS -DCUDA -DCSR
 else ifeq ($(MODE), csr_adaptive) 
     DEFINES= -DCORRECTNESS -DCUDA -DCSR -DCSR_ADAPTIVE
+else ifeq ($(MODE), csr_vector) 
+	DEFINES= -DCORRECTNESS -DCUDA -DCSR -DCSR_VECTOR
 else 
  	DEFINES= -DCORRECTNESS -DCUDA -DELLPACK
 endif
