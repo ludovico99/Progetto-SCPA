@@ -184,14 +184,14 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
  */
 __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
-    __shared__ double vals[MAX_BLOCK_DIM];
+    __shared__ volatile double vals[MAX_BLOCK_DIM];
 
     const int num_elements = M * K;
 
     /* Thread identifier */
     const int tid = blockDim.x * blockIdx.x + threadIdx.x; // global thread index
 
-    const int tid_within_warp = threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
+    const int lane = threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
 
     /* Global Warp Index */
     const int warp_id = tid / WARP_SIZE;
@@ -217,7 +217,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
             end = nz;
 
         double sum = 0.0;
-        for (int j = start + tid_within_warp; j < end; j += WARP_SIZE)
+        for (int j = start + lane; j < end; j += WARP_SIZE)
         {
 
             if (d_as != NULL)
@@ -225,30 +225,32 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
             else
                 sum += 1.0 * d_X[d_ja[j] * K + z];
         }
+
         vals[threadIdx.x] = sum;
+       // __syncthreads();
         /**
          * Parallel reduction in shared memory
          */
-        if (tid_within_warp < 16)
+        if (lane < 16)
             vals[threadIdx.x] += vals[threadIdx.x + 16];
 
-        if (tid_within_warp < 8)
+        if (lane < 8)
             vals[threadIdx.x] += vals[threadIdx.x + 8];
 
-        if (tid_within_warp < 4)
+        if (lane < 4)
             vals[threadIdx.x] += vals[threadIdx.x + 4];
 
-        if (tid_within_warp < 2)
+        if (lane < 2)
             vals[threadIdx.x] += vals[threadIdx.x + 2];
 
-        if (tid_within_warp < 1)
+        if (lane < 1)
             vals[threadIdx.x] += vals[threadIdx.x + 1];
 
-        __syncthreads();
+        //__syncthreads();
         /**
          * Only the first thread writes the result
          */
-        if (tid_within_warp == 0)
+        if (lane == 0)
         {
             d_y[i * K + z] += vals[threadIdx.x];
 
