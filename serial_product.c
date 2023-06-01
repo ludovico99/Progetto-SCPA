@@ -73,7 +73,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
             double partial_sum = 0.0;
 
             for (int j = start; j < end; j++)
-            {
+            {   
                 if (as != NULL) // A is not a pattern matrix
                     partial_sum += as[j] * X[ja[j]][z];
                 else
@@ -100,7 +100,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
     AUDIT printf("ELAPSED TIME FOR SERIAL PRODUCT: %lf\n", accum);
     AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
 
-    print_y(M, K, y);
+    //print_y(M, K, y);
     return y;
 }
 

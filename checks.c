@@ -223,8 +223,10 @@ void check_correctness(int M, int K, double **y_serial, double *y_parallel)
 {
 
     double abs_err = 0.0;
+    double max_abs = 0.0;
     double rel_err = 0.0;
-    double max_abs;
+    double sum_rel_err = 0.0;
+    double correct_value = 0.0;
 
     for (int i = 0; i < M; i++)
     {
@@ -234,21 +236,26 @@ void check_correctness(int M, int K, double **y_serial, double *y_parallel)
              * Computing the absolute error and relative error for each element in y
              */
 #ifdef CUDA
-            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
+            //max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i * K + z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i * K + z]);
 #elif OPENMP
-            max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
+            //max_abs = max(fabs(y_serial[i][z]), fabs(y_parallel[i][z]));
             abs_err = fabs(y_serial[i][z] - y_parallel[i][z]);
-#endif
-            if (max_abs == 0.0)
-                max_abs = 1.0;
+#endif      
+            correct_value = fabs(y_serial[i][z]);
+            //if (max_abs == 0.0) max_abs = 1.0;
+            if (correct_value == 0.0) correct_value = 1.0;
 
-            rel_err = max(rel_err, abs_err / y_serial[i][z]);
+            sum_rel_err += abs_err / correct_value;
+            rel_err = max(rel_err, abs_err / correct_value);
         }
     }
+
+    double mean_rel_err = sum_rel_err /(M * K);
+
     /**
      * Checking if the two resulting matrixes are equal or not.
      * TOLLERANZA (2.22e^-16 is the threshold) is the IEEE unit roundoff for a double
      */
-    printf("I due prodotti matrice-matrice hanno un max relative error pari a %.20lf (%.20lf is the threshold).\n", rel_err, DBL_EPSILON);
+    printf("I due prodotti matrice-matrice hanno un max relative error: %.20lf e un mean relative error: %.20lf (%.20lf is the threshold).\n", rel_err, mean_rel_err, DBL_EPSILON);
 }

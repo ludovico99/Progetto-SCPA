@@ -484,8 +484,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     memory_allocation_Cuda(double, M *K, d_y);
     /* Device allocation for dense matrix X */
     memory_allocation_Cuda(double, N *K, d_X);
-    /* Device allocation for the as vector containing non-zero elements */
-    memory_allocation_Cuda(double, nz, d_as);
+    if (h_as != NULL)
+        /* Device allocation for the as vector containing non-zero elements */
+        memory_allocation_Cuda(double, nz, d_as);
+
     /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(int, nz, d_ja);
     /* Device allocation for the irp vector containing the pointer to the vector entry ja */
@@ -493,8 +495,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Copy input data from the host memory to the CUDA device\n");
 
-    /* Copy of the contents of the vector as from the Host to the Device */
-    memcpy_to_dev(h_as, d_as, double, nz);
+    if (h_as != NULL)
+        /* Copy of the contents of the vector as from the Host to the Device */
+        memcpy_to_dev(h_as, d_as, double, nz);
+
     /* Copy of the contents of the vector ja from the Host to the Device */
     memcpy_to_dev(h_ja, d_ja, int, nz);
     /* Copy of the contents of the vector irp from the Host to the Devicee */
@@ -522,7 +526,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #elif CSR_VECTOR
 
-     /* Number of elements of the product matrix Y */
+    /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
     int warpsPerBlock = threadsPerBlock / WARP_SIZE;
@@ -596,8 +600,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     /* Start the memory cleaning process on Device */
     printf("Freeing Device memory ...\n");
-
-    free_memory_Cuda(d_as);
+    if (h_as != NULL)
+        free_memory_Cuda(d_as);
     free_memory_Cuda(d_ja);
     free_memory_Cuda(d_irp);
     free_memory_Cuda(d_X);
@@ -611,7 +615,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Freeing host memory ...\n");
 
-    print_y_GPU(M, K, h_y);
+    // print_y_GPU(M, K, h_y);
 
     free(h_X);
 

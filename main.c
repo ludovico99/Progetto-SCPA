@@ -95,17 +95,17 @@ int main(int argc, char *argv[])
 
 #ifdef ELLPACK
     // Declaring variables for ELLPACK matrix representation
-    double **values;
-    int **col_indices;
+    double **values = NULL;
+    int **col_indices = NULL;
 
     int *nz_per_row = NULL;
 
 #elif CSR
 
     // Declaring variables for CSR matrix representation
-    double *as;
-    int *ja;
-    int *irp;
+    double *as = NULL;
+    int *ja = NULL;
+    int *irp = NULL;
 #endif
 
 #ifdef CUDA

@@ -115,35 +115,37 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     int *d_sum_nz = NULL;
 
     float expireTimeMsec = 0.0;
-     
-     /* 2D to 1D dense matrix X conversion*/
+
+    /* 2D to 1D dense matrix X conversion*/
     h_X = convert_2D_to_1D(M, K, X);
 
     /* Y array host memory allocation */
     memory_allocation(double, M *K, h_y);
-    
+
     /* irregular 2D to 1D conversions*/
-    h_values = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, values);
+    if (values != NULL)
+        h_values = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, values);
     h_col_indices = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, col_indices);
 
     printf("Allocating device variables for CPU ELLPACK product ...\n");
     /* Y array host memory allocation */
     memory_allocation_Cuda(double, M *K, d_y);
-     /* Device allocation for dense matrix X */
+    /* Device allocation for dense matrix X */
     memory_allocation_Cuda(double, N *K, d_X);
-  /* Device allocation for the 2D array ontaining non-zero elements */
-    memory_allocation_Cuda(double, nz, d_values);
-/* Device allocation for the 2D array of column indexes */
+    if (values != NULL)
+        /* Device allocation for the 2D array ontaining non-zero elements */
+        memory_allocation_Cuda(double, nz, d_values);
+    /* Device allocation for the 2D array of column indexes */
     memory_allocation_Cuda(int, nz, d_col_indices);
     /* Device allocation for the array of non-zeroes per row*/
     memory_allocation_Cuda(int, M, d_nz_per_row);
-     /* Device allocation for the array of the sums of non-zeroes*/
+    /* Device allocation for the array of the sums of non-zeroes*/
     memory_allocation_Cuda(int, M, d_sum_nz);
 
-
     printf("Copy input data from the host memory to the CUDA device\n");
-    /* Copy of the contents of the h_values from the Host to the Device */
-    memcpy_to_dev(h_values, d_values, double, nz);
+    if (values != NULL)
+        /* Copy of the contents of the h_values from the Host to the Device */
+        memcpy_to_dev(h_values, d_values, double, nz);
     /* Copy of the contents of h_col_indices from the Host to the Device */
     memcpy_to_dev(h_col_indices, d_col_indices, int, nz);
     /* Copy of the contents of the dense vector h_X from the Host to the Devicee */
@@ -197,8 +199,8 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     memcpy_to_host(d_y, h_y, double, M *K);
     /* Start the memory cleaning process on Device */
     printf("Freeing Device memory ...\n");
-
-    free_memory_Cuda(d_values);
+    if (values != NULL)
+        free_memory_Cuda(d_values);
     free_memory_Cuda(d_col_indices);
     free_memory_Cuda(d_nz_per_row);
     free_memory_Cuda(d_sum_nz);
