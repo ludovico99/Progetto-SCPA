@@ -423,6 +423,10 @@ static int csr_adaptive_rowblocks(int M, int *irp, int **rowBlocks, int *threads
             else if (i - last_i == 1)
             {
                 // This row is too large. It has too much zeroes
+                /**
+                 * WARNING: With adder_dcop_32 has too much zeroes in the last row (1311 nz in the last one).
+                 * The evidence is that the max relative error is big. However this is an algorithm problem and we proved it empirically.
+                */
                 (*rowBlocks)[ctr++] = i;
             }
 
