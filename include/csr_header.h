@@ -2,7 +2,6 @@
 #define CSR_HEADER_H
 
 #ifdef SAMPLINGS
-#define SAMPLING_SIZE 30
 extern void computing_samplings_openMP(int, int, int *, int, double *, int *, int *, int);
 #endif
 

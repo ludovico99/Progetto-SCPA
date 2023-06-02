@@ -11,8 +11,6 @@
 #include "lib/mmio.h"
 #include "include/header.h"
 
-#define SAMPLING_SIZE 30
-
 char *filename = NULL;
 FILE *f = NULL;
 
@@ -291,7 +289,21 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef CUDA
-    // TODO
+    int k = sizeof(K)/sizeof(int) - 1;
+    create_dense_matrix(N, K[k], &X);
+#ifdef CSR
+
+    /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
+    y_parallel_cuda = CSR_GPU(M, N, K[k], nz, as, ja, irp, X, NULL);
+
+#elif ELLPACK
+
+    /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
+    y_parallel_cuda = ELLPACK_GPU(M, N, K[k], nz, nz_per_row, values, col_indices, X, NULL);
+
+#endif
+    free(y_parallel_cuda);
+
 #endif // CUDA
 
     if (f != stdin)

@@ -25,6 +25,7 @@
 #include "cuda_header.h"
 #endif
 
+
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define memory_allocation(tipo, dimensione, puntatore)                       \
@@ -64,6 +65,11 @@ extern void print_y(int, int, double **);
 extern void print_y_GPU(int, int, double *);
 extern double *transpose(int, int, double **);
 extern void get_time(struct timespec *);
+
+#ifdef SAMPLINGS
+extern double calculate_M2(double, double, double, int);
+extern double calculate_mean(double, double, int);
+#endif
 
 extern char *filename;
 extern FILE *f;

@@ -14,16 +14,28 @@ OPENMP=--compiler-options -fopenmp
 INCLUDES=-I${cudaPath}/samples/common/inc
 FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
+
+# to choose which implemented algorithms to use
 MODE = csr_adaptive
+#to do some sampling of the computed stats
+SAMPLING = no
+
+
 
 ifeq ($(MODE), csr)
-    DEFINES= -DCORRECTNESS -DCUDA -DCSR
+    DEFINES = -DCUDA -DCSR
 else ifeq ($(MODE), csr_adaptive) 
-    DEFINES= -DCORRECTNESS -DCUDA -DCSR -DCSR_ADAPTIVE
+    DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE
 else ifeq ($(MODE), csr_vector) 
-	DEFINES= -DCORRECTNESS -DCUDA -DCSR -DCSR_VECTOR
+	DEFINES = -DCUDA -DCSR -DCSR_VECTOR
 else 
- 	DEFINES= -DCORRECTNESS -DCUDA -DELLPACK
+ 	DEFINES = -DCUDA -DELLPACK
+endif
+
+ifeq ($(SAMPLING), yes)
+	DEFINES += -DSAMPLINGS
+else 
+	DEFINES += -DCORRECTNESS
 endif
 
 all: build
@@ -114,6 +126,9 @@ PR02R:
 
 dc1:
 	$(binDir)/app Matrici/dc1/dc1.mtx 
+
+F1:
+	$(binDir)/app Matrici/F1/F1.mtx 
 
 raefsky2:
 	$(binDir)/app Matrici/raefsky2/raefsky2.mtx 

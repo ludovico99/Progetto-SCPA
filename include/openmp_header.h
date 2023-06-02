@@ -1,6 +1,10 @@
 #ifndef OPENMP_HEADER_H
 #define OPENMP_HEADER_H
 
+#ifdef SAMPLINGS
+#define SAMPLING_SIZE 30
+#endif
+
 extern void check_correctness(int, int, double **, double **);
 
 #ifdef ELLPACK

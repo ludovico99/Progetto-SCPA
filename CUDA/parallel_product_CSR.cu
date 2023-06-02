@@ -196,8 +196,6 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     /* Global Warp Index */
     const int warp_id = tid / WARP_SIZE;
 
-    const int warp_lane = threadIdx.x / WARP_SIZE; // warp index within the block
-
     /* Row of the item that the warp should compute */
     const int i = warp_id / K;
 
@@ -325,7 +323,8 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
                 double temp = 0.0;
                 for (int j = (start - first_col); j < (end - first_col); j++)
                 {
-                    if (j < blockDim.x) temp += LDS[j];
+                    if (j < blockDim.x)
+                        temp += LDS[j];
                 }
 
                 d_y[i * K + z] = temp;
@@ -375,14 +374,16 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
  *
  *
  * @param M: Number of rows
+ * @param nz: Number of non-zeroes
  * @param irp: Vector containing the column index of the first nonzero of rows
  * @param rowBlocks: Array containing the starting row index per block
+ * @param threadsPerBlock: pointer to an integer representing the computed threads per block
  *
  * Returns the number of blocks computed
  *
  * */
 
-static int csr_adaptive_rowblocks(int M, int *irp, int **rowBlocks, int *threadsPerBlock)
+static int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *threadsPerBlock)
 {
 
     all_zeroes_memory_allocation(int, M, *rowBlocks);
@@ -402,9 +403,12 @@ static int csr_adaptive_rowblocks(int M, int *irp, int **rowBlocks, int *threads
     if (local_size > MAX_BLOCK_DIM)
         local_size = MAX_BLOCK_DIM;
 
-    for (int i = 1; i < M; i++)
+    for (int i = 1; i <= M; i++)
     {
-        sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in this row
+        if (i == M)
+            sum_nz += nz - irp[i - 1];
+        else
+            sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in this row
 
         if (sum_nz == local_size)
         { // The row fills up to LOCAL SIZE
@@ -423,10 +427,6 @@ static int csr_adaptive_rowblocks(int M, int *irp, int **rowBlocks, int *threads
             else if (i - last_i == 1)
             {
                 // This row is too large. It has too much zeroes
-                /**
-                 * WARNING: adder_dcop_32.mtx has too much zeroes in the last row (1311 nz in the last one).
-                 * The evidence is that the max relative error is big. However this is an algorithm problem and we proved it empirically.
-                */
                 (*rowBlocks)[ctr++] = i;
             }
 
@@ -497,7 +497,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #endif
 
     /* 2D to 1D dense matrix X conversion*/
-    h_X = convert_2D_to_1D(M, K, X);
+    h_X = convert_2D_to_1D(N, K, X);
 
     /* Y array host memory allocation */
     memory_allocation(double, M *K, h_y);
@@ -507,7 +507,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Y array host memory allocation */
     memory_allocation_Cuda(double, M *K, d_y);
     /* Device allocation for dense matrix X */
-    memory_allocation_Cuda(double, N *K, d_X);
+    memory_allocation_Cuda(double, N * K, d_X);
     if (h_as != NULL)
         /* Device allocation for the as vector containing non-zero elements */
         memory_allocation_Cuda(double, nz, d_as);
@@ -537,9 +537,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #ifdef CSR_ADAPTIVE
 
-    int number_of_blocks = csr_adaptive_rowblocks(M, h_irp, &rowBlocks, &threadsPerBlock);
-
-    int warpsPerBlock = threadsPerBlock / WARP_SIZE;
+    int number_of_blocks = csr_adaptive_rowblocks(M, nz, h_irp, &rowBlocks, &threadsPerBlock);
 
     // /* Device allocation for d_rowBlocks */
     memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -570,19 +568,79 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #endif
 
-    printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
+    printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K, blocksPerGrid,
            threadsPerBlock);
 
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
+#ifdef SAMPLINGS
+
+    double mean = 0.0;
+    double M2 = 0.0;
+    double variance = 0.0;
+    double Gflops = 0.0;
+
+    for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp ++)
+    {       
+    // START TIMER
+    checkCudaErrors(cudaEventRecord(start, stream));
+#ifdef CSR_ADAPTIVE
+
+        /* CSR Adaptive */
+        CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+
+#elif CSR_VECTOR
+        //  /* CSR Vector */
+        CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+
+#else
+
+        /* Versione accesso alla memoria globale non ottimizzato */
+        // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+
+        // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+
+        /* Versione accesso alla memoria globale ottimizzato */
+        CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+
+#endif
+
+        err = cudaGetLastError();
+        if (err != cudaSuccess)
+        {
+            fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
+                    cudaGetErrorString(err));
+            exit(EXIT_FAILURE);
+        }
+
+        // STOP TIMER
+        checkCudaErrors(cudaEventRecord(stop, stream));
+        checkCudaErrors(cudaEventSynchronize(stop));
+        checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+
+        mean = calculate_mean(expireTimeMsec, mean, curr_samp + 1);
+        M2 = calculate_M2(expireTimeMsec, mean, M2, curr_samp + 1);
+        Gflops = calculate_mean(compute_GFLOPS(K, nz, expireTimeMsec * 1e6), Gflops, curr_samp + 1);
+
+    }
+
+    variance = M2 / (SAMPLING_SIZE - 1);
+
+    printf("ELAPSED MEAN (VARIANCE %lf ns) TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n",variance *1e6, mean * 1e6, mean, mean * 1e-3);
+
+    if (time != NULL)
+        *time = expireTimeMsec * 1e6;
+
+    printf("MEAN GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", Gflops);
+#else
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
 #ifdef CSR_ADAPTIVE
 
     /* CSR Adaptive */
-    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double) >>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
 
 #elif CSR_VECTOR
     //  /* CSR Vector */
@@ -598,7 +656,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Versione accesso alla memoria globale ottimizzato */
     CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
 
-#endif
+#endif //CSR_ADAPTIVE
 
     err = cudaGetLastError();
     if (err != cudaSuccess)
@@ -618,6 +676,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     if (time != NULL)
         *time = expireTimeMsec * 1e6;
     printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
+
+#endif
 
     printf("Copy output data from the CUDA device to the host memory\n");
 
@@ -641,7 +701,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Freeing host memory ...\n");
 
-    //print_y_GPU(M, K, h_y);
+    // print_y_GPU(M, K, h_y);
 
     free(h_X);
 
@@ -649,7 +709,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     free(rowBlocks);
 #endif
 
-    printf("Completed parallel product CSR without streams...\n");
+    printf("Completed parallel product CSR ...\n");
 
     return h_y;
 }

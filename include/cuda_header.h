@@ -1,6 +1,10 @@
 #ifndef CUDA_HEADER_H
 #define CUDA_HEADER_H
 
+#ifdef SAMPLINGS
+#define SAMPLING_SIZE 3
+#endif
+
 #define memory_allocation_Cuda(tipo, dimensione, puntatore)                                              \
     err = cudaMalloc((void **)&puntatore, dimensione * sizeof(tipo));                                    \
     if (err != cudaSuccess)                                                                              \

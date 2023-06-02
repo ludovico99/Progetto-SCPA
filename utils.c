@@ -364,3 +364,43 @@ void get_time(struct timespec *time)
         exit(EXIT_FAILURE);
     }
 }
+
+/**
+ *
+ * calculate_mean - Computing mean with the Welford’s one-pass algorithm
+ *
+ *@param x: Newest estimation point
+ *@param mean: Current value for mean 
+ *@param n:  It is a counter that tracks the number of items in the sequence
+ *
+ * Returns the newest computed mean
+ */
+double calculate_mean(double x, double mean, int n)
+{
+    mean += (x - mean) / n; //Updating the mean
+    return mean;
+}
+
+/**
+ *
+ * calculate_M2 - Computing sum of squared differences with the Welford’s one-pass algorithm
+ *
+ *@param x: Newest estimation point
+ *@param mean: Current value for mean 
+ *@param M2 : sum of squared differences 
+ *@param n: It is a counter that tracks the number of items in the sequence
+
+ * Returns the newest computed sum of squared differences 
+ */
+
+double calculate_M2(double x, double mean, double M2, int n)
+{
+    if (n == 1)
+    {
+        return 0.0;
+    }
+    double delta = x - mean;
+    mean = calculate_mean(x, mean, n);
+    M2 += delta * (x - mean);
+    return M2; 
+}
