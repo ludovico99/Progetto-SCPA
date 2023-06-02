@@ -227,7 +227,8 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
         }
 
         vals[threadIdx.x] = sum;
-       // __syncthreads();
+
+        // __syncthreads();
         /**
          * Parallel reduction in shared memory
          */
@@ -246,18 +247,13 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
         if (lane < 1)
             vals[threadIdx.x] += vals[threadIdx.x + 1];
 
-        //__syncthreads();
         /**
          * Only the first thread writes the result
          */
+
         if (lane == 0)
         {
             d_y[i * K + z] += vals[threadIdx.x];
-
-            // for (int j = threadIdx.x; j < threadIdx.x + WARP_SIZE; j ++)
-            // {
-            //     d_y[i * K + z] = vals[j];
-            // }
         }
     }
 }
@@ -281,74 +277,96 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
 
     extern __shared__ volatile double LDS[];
 
-    const int startRow = d_rowBlocks[blockIdx.x];
+    const int startRow = d_rowBlocks[blockIdx.x / K];
 
-    const int nextStartRow = d_rowBlocks[blockIdx.x + 1];
+    const int nextStartRow = d_rowBlocks[(blockIdx.x / K) + 1];
 
     const int num_rows = nextStartRow - startRow;
 
     const int tid_within_block = threadIdx.x;
 
-    const int z = tid_within_block % K;
+    const int z = blockIdx.x % K;
 
     LDS[tid_within_block] = 0.0;
+
     // If the block consists of more than one row then run CSR Stream
-    if (num_rows > 1)
+    if (nextStartRow <= M)
     {
-
-        int nnz = d_irp[nextStartRow] - d_irp[startRow];
-        int first_col = d_irp[startRow];
-
-        // Each thread writes to shared memory
-        if (tid_within_block < nnz)
+        if (num_rows > 1)
         {
-            LDS[tid_within_block] = d_as[first_col + tid_within_block] * d_X[d_ja[first_col + tid_within_block] * K + z];
-        }
-        __syncthreads();
+            int nnz = 0;
 
-        // Threads that fall within a range sum up the partial results
-        for (int i = startRow + tid_within_block; i < nextStartRow; i += blockDim.x)
-        {
-            double temp = 0.0;
-            for (int j = (d_irp[i] - first_col); j < (d_irp[i + 1] - first_col); j++)
+            if (nextStartRow < M)
+                nnz = d_irp[nextStartRow] - d_irp[startRow];
+            else
+                nnz = nz - d_irp[startRow];
+
+            int first_col = d_irp[startRow];
+
+            // Each thread writes to shared memory
+            if (tid_within_block < nnz)
+            {
+                LDS[tid_within_block] = d_as[first_col + tid_within_block] * d_X[d_ja[first_col + tid_within_block] * K + z];
+            }
+            __syncthreads();
+
+            // Threads that fall within a range sum up the partial results
+            for (int i = startRow + tid_within_block; i < nextStartRow; i += blockDim.x)
             {
 
-                temp += LDS[j];
+                int start = d_irp[i];
+                int end = 0;
+
+                if (i < M - 1)
+                    end = d_irp[i + 1];
+                else
+                    end = nz;
+
+                double temp = 0.0;
+                for (int j = (start - first_col); j < (end - first_col); j++)
+                {
+                    if (j < blockDim.x) temp += LDS[j];
+                }
+
+                d_y[i * K + z] = temp;
+            }
+        }
+        // If the block consists of only one row then run CSR Vector
+        else
+        {
+            int rowStart = d_irp[startRow];
+
+            int rowEnd = 0;
+            if (nextStartRow < M)
+                rowEnd = d_irp[nextStartRow];
+            else
+                rowEnd = nz;
+
+            double sum = 0.0;
+
+            // Use all threads in a warp to accumulate multiplied elements
+            for (int j = rowStart + tid_within_block; j < rowEnd; j += blockDim.x)
+            {
+
+                sum += d_as[j] * d_X[d_ja[j] * K + z];
             }
 
-            d_y[i * K + z] = temp;
-        }
-    }
-    // If the block consists of only one row then run CSR Vector
-    else
-    {
-        int rowStart = d_irp[startRow];
-        int rowEnd = d_irp[nextStartRow];
-
-        double sum = 0.0;
-
-        // Use all threads in a warp to accumulate multiplied elements
-        for (int j = rowStart + tid_within_block; j < rowEnd; j += blockDim.x)
-        {
-
-            sum += d_as[j] * d_X[d_ja[j] * K + z];
-        }
-
-        LDS[tid_within_block] = sum;
-        __syncthreads();
-
-        // Reduce partial sums
-
-        for (int stride = blockDim.x >> 1; stride > 0; stride >>= 1)
-        {
+            LDS[tid_within_block] = sum;
             __syncthreads();
-            if (tid_within_block < stride)
-                LDS[tid_within_block] += LDS[tid_within_block + stride];
-        }
 
-        // Write result
-        if (tid_within_block == 0)
-            d_y[startRow * K + z] = LDS[tid_within_block];
+            // Reduce partial sums
+
+            for (int stride = blockDim.x >> 1; stride > 0; stride >>= 1)
+            {
+                __syncthreads();
+                if (tid_within_block < stride)
+                    LDS[tid_within_block] += LDS[tid_within_block + stride];
+            }
+
+            // Write result
+            if (tid_within_block == 0)
+                d_y[startRow * K + z] = LDS[tid_within_block];
+        }
     }
 }
 
@@ -364,7 +382,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
  *
  * */
 
-static int csr_adaptive_rowblocks(int M, int K, int *irp, int **rowBlocks, int *threadsPerBlock)
+static int csr_adaptive_rowblocks(int M, int *irp, int **rowBlocks, int *threadsPerBlock)
 {
 
     all_zeroes_memory_allocation(int, M, *rowBlocks);
@@ -515,7 +533,9 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #ifdef CSR_ADAPTIVE
 
-    int number_of_blocks = csr_adaptive_rowblocks(M, K, h_irp, &rowBlocks, &threadsPerBlock);
+    int number_of_blocks = csr_adaptive_rowblocks(M, h_irp, &rowBlocks, &threadsPerBlock);
+
+    int warpsPerBlock = threadsPerBlock / WARP_SIZE;
 
     // /* Device allocation for d_rowBlocks */
     memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -524,7 +544,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
 
     /* Number of blocks per grid */
-    int blocksPerGrid = number_of_blocks - 1;
+    int blocksPerGrid = (number_of_blocks - 1) * K;
 
 #elif CSR_VECTOR
 
@@ -558,7 +578,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #ifdef CSR_ADAPTIVE
 
     /* CSR Adaptive */
-    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double) >>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
 
 #elif CSR_VECTOR
     //  /* CSR Vector */
@@ -617,7 +637,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("Freeing host memory ...\n");
 
-    // print_y_GPU(M, K, h_y);
+    //print_y_GPU(M, K, h_y);
 
     free(h_X);
 

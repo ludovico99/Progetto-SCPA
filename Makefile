@@ -14,7 +14,7 @@ OPENMP=--compiler-options -fopenmp
 INCLUDES=-I${cudaPath}/samples/common/inc
 FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
-MODE = csr_vector
+MODE = csr_adaptive
 
 ifeq ($(MODE), csr)
     DEFINES= -DCORRECTNESS -DCUDA -DCSR
