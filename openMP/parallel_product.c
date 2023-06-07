@@ -47,6 +47,11 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
     AUDIT printf("y correctly allocated ... \n");
 
     /**
+     * Computing of the transpose of X
+     */
+    double *X_T = transpose(N, K, X);
+
+    /**
      * Computing the size of the chunk to be assigned to each thread
      */
 
@@ -61,7 +66,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
      * Starting parallel sparse matrix - dense vector product
      */
 
-#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(y, as, ja, irp, X, M, K, nz, nthread, chunk_size) default(none)
+#pragma omp parallel for schedule(static, chunk_size) num_threads(nthread) shared(y, as, ja, irp, X_T, M, N, K, nz, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
     {
         int start = irp[i]; // Starting index for the i-th row
@@ -80,15 +85,15 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
             for (int j = start; j < end; j++)
             {
                 if (as != NULL)
-                    partial_sum += as[j] * X[ja[j]][z];
+                    partial_sum += as[j] * X_T[z * N + ja[j]];
                 else
-                    partial_sum += 1.0 * X[ja[j]][z];
+                    partial_sum += 1.0 * X_T[z * N + ja[j]];
             }
 
             y[i][z] = partial_sum;
         }
     }
-    
+
     /**
      * Getting the elapsed time ssince—as described by POSIX—"some unspecified point in the past"
      */
@@ -102,6 +107,9 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     if (time != NULL)
         *time = accum;
+
+    if (X_T != NULL)
+        free(X_T);
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
     AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
@@ -155,6 +163,11 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
     chunk_size = compute_chunk_size(M, nthread);
 
     /**
+     * Computing of the transpose of X
+     */
+    double *X_T = transpose(N, K, X);
+
+    /**
      * Getting the elapsed time since—as described by POSIX—"some unspecified point in the past"
      */
 
@@ -164,7 +177,7 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
      * Starting parallel sparse matrix - dense vector product
      */
 
-#pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, K, max_nz_per_row, as, X, ja, nthread, chunk_size) default(none)
+#pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, N, K, max_nz_per_row, as, X_T, ja, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
     {
 
@@ -180,16 +193,16 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
                 }
 
                 if (as != NULL)
-                    partial_sum += as[i][j] * X[ja[i][j]][z];
+                    partial_sum += as[i][j] * X_T[z * N + ja[i][j]];
                 else
-                    partial_sum += 1.0 * X[ja[i][j]][z];
+                    partial_sum += 1.0 * X_T[z * N + ja[i][j]];
 
                 y[i][z] = partial_sum;
 
                 if (j < max_nz_per_row - 2)
                 {
-                    if (ja[i][j] == ja[i][j + 1])
-                        ; // It means that the i - th row has no more zeros break;
+                    if (ja[i][j] == ja[i][j + 1]) // It means that the i - th row has no more zeros
+                        break;
                 }
             }
         }
@@ -210,6 +223,9 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     if (time != NULL)
         *time = accum;
+
+    if (X_T != NULL)
+        free(X_T);
 
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
     AUDIT printf("GLOPS are %lf\n", compute_GFLOPS(K, nz, accum * 1e9));
@@ -262,7 +278,13 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
     AUDIT printf("y correctly allocated ... \n");
 
     /**
-     * Getting the elapsed time ssince—as described by POSIX—"some unspecified point in the past"
+     * Computing of the transpose of X
+     */
+
+    double *X_T = transpose(N, K, X);
+
+    /**
+     * Getting the elapsed time since—as described by POSIX—"some unspecified point in the past"
      */
 
     get_time(&start);
@@ -271,7 +293,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
      * Starting parallel sparse matrix - dense vector product
      */
 
-#pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, K, nz_per_row, as, X, ja, nthread, chunk_size) default(none)
+#pragma omp parallel for collapse(2) schedule(static, chunk_size) num_threads(nthread) shared(y, M, N, K, nz_per_row, as, X_T, ja, nthread, chunk_size) default(none)
     for (int i = 0; i < M; i++)
     {
         for (int z = 0; z < K; z++)
@@ -286,9 +308,9 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
                 for (int j = 0; j < end; j++)
                 {
                     if (as != NULL)
-                        partial_sum += as[i][j] * X[ja[i][j]][z];
+                        partial_sum += as[i][j] * X_T[z * N + ja[i][j]];
                     else
-                        partial_sum += 1.0 * X[ja[i][j]][z];
+                        partial_sum += 1.0 * X_T[z * N + ja[i][j]];
                 }
                 y[i][z] = partial_sum;
             }
@@ -308,6 +330,9 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
     double accum = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     if (time != NULL)
         *time = accum;
+
+    if (X_T != NULL)
+        free(X_T);
 
     AUDIT printf("Completed parallel product ...\n");
     AUDIT printf("ELAPSED TIME FOR PARALLEL PRODUCT: %lf\n", accum);
