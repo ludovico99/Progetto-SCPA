@@ -91,7 +91,7 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *s
  * Returns the resulting/product matrix computed by the GPU kernel
  */
 
-double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **values, int **col_indices, double **X, double *time)
+double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **values, int **col_indices, double **X)
 {
     // Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
@@ -170,48 +170,6 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
-#ifdef SAMPLINGS
-
-    double mean = 0.0;
-    double M2 = 0.0;
-    double variance = 0.0;
-    double Gflops = 0.0;
-
-    for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
-    {
-        // START TIMER
-        checkCudaErrors(cudaEventRecord(start, stream));
-
-        ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, numElements);
-
-        err = cudaGetLastError();
-        if (err != cudaSuccess)
-        {
-            fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
-                    cudaGetErrorString(err));
-            exit(EXIT_FAILURE);
-        }
-
-        // STOP TIMER
-        checkCudaErrors(cudaEventRecord(stop, stream));
-        checkCudaErrors(cudaEventSynchronize(stop));
-        checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
-
-        mean = calculate_mean(expireTimeMsec, mean, curr_samp + 1);
-        M2 = calculate_M2(expireTimeMsec, mean, M2, curr_samp + 1);
-        Gflops = calculate_mean(compute_GFLOPS(K, nz, expireTimeMsec * 1e6), Gflops, curr_samp + 1);
-    }
-
-    variance = M2 / (SAMPLING_SIZE - 1);
-
-    printf("ELAPSED MEAN (VARIANCE %lf ns) TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", variance * 1e6, mean * 1e6, mean, mean * 1e-3);
-
-    if (time != NULL)
-        *time = expireTimeMsec * 1e6;
-
-    printf("MEAN GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", Gflops);
-
-#else
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
@@ -231,11 +189,7 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec * 1e-3);
 
-    if (time != NULL)
-        *time = expireTimeMsec * 1e6;
     printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
-
-#endif
 
     printf("Copy output data from the CUDA device to the host memory\n");
 

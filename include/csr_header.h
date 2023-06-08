@@ -2,7 +2,7 @@
 #define CSR_HEADER_H
 
 #ifdef SAMPLINGS
-extern void computing_samplings_openMP(int, int, int *, int, double *, int *, int *, int);
+extern void computing_samplings_openMP(int, int, int, double *, int *, int *, int);
 #endif
 
 #ifdef CHECK_CONVERSION

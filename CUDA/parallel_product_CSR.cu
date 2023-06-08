@@ -10,8 +10,6 @@
 #include <helper_timer.h> // For CUDA SDK timers
 #include "../include/header.h"
 
-#define MAX_BLOCK_DIM 1024
-#define WARP_SIZE 32
 
 /**
  * CSR_kernel_v1 -  Product implementation between sparse matrix A and dense matrix X
@@ -465,7 +463,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
  *
  * */
 
-static int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *threadsPerBlock)
+int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *threadsPerBlock)
 {
 
     all_zeroes_memory_allocation(int, M, *rowBlocks);
@@ -558,7 +556,7 @@ static int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int 
  * Returns the resulting/product matrix computed by the GPU kernel
  */
 
-double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp, double **X, double *time)
+double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp, double **X)
 {
     cudaError_t err = cudaSuccess;
     cudaEvent_t start, stop;
@@ -665,65 +663,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
-#ifdef SAMPLINGS
-
-    double mean = 0.0;
-    double M2 = 0.0;
-    double variance = 0.0;
-    double Gflops = 0.0;
-
-    for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
-    {
-        // START TIMER
-        checkCudaErrors(cudaEventRecord(start, stream));
-#ifdef CSR_ADAPTIVE
-
-        /* CSR Adaptive */
-        CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
-
-#elif CSR_VECTOR
-        //  /* CSR Vector */
-        CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
-
-#else
-
-        /* Versione accesso alla memoria globale non ottimizzato */
-        // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
-
-        // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
-
-        /* Versione accesso alla memoria globale ottimizzato */
-        CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
-
-#endif
-
-        err = cudaGetLastError();
-        if (err != cudaSuccess)
-        {
-            fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
-                    cudaGetErrorString(err));
-            exit(EXIT_FAILURE);
-        }
-
-        // STOP TIMER
-        checkCudaErrors(cudaEventRecord(stop, stream));
-        checkCudaErrors(cudaEventSynchronize(stop));
-        checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
-
-        mean = calculate_mean(expireTimeMsec, mean, curr_samp + 1);
-        M2 = calculate_M2(expireTimeMsec, mean, M2, curr_samp + 1);
-        Gflops = calculate_mean(compute_GFLOPS(K, nz, expireTimeMsec * 1e6), Gflops, curr_samp + 1);
-    }
-
-    variance = M2 / (SAMPLING_SIZE - 1);
-
-    printf("ELAPSED MEAN (VARIANCE %lf ns) TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", variance * 1e6, mean * 1e6, mean, mean * 1e-3);
-
-    if (time != NULL)
-        *time = expireTimeMsec * 1e6;
-
-    printf("MEAN GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", Gflops);
-#else
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
@@ -767,11 +706,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec * 1e-3);
 
-    if (time != NULL)
-        *time = expireTimeMsec * 1e6;
     printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
-
-#endif
 
     printf("Copy output data from the CUDA device to the host memory\n");
 

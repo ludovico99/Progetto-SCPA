@@ -1,8 +1,9 @@
 #include "include/header.h"
 #include "lib/mmio.h"
 #include <stdlib.h>
+
 /**
- * create_dense_matrix - Create a dense matrix (assuming the number of non-zeros is zero) of all 1.0
+ * create_dense_matrix - Create a dense matrix (assuming the number of non-zeros is zero) of random values from 0.0 to 1.0
  * @param N: Number of rows
  * @param K: Number of columns
  * @param nz: Number of nz
@@ -27,6 +28,33 @@ void create_dense_matrix(int N, int K, double ***X)
 
     AUDIT printf("Completed dense matrix creation...\n");
 }
+
+
+/**
+ * create_dense_matrix_1D - Create a dense matrix (assuming the number of non-zeros is zero) of random values from 0.0 to 1.0
+ * @param N: Number of rows
+ * @param K: Number of columns
+ * @param nz: Number of nz
+ * @param X: Pointer to a 1D array of double 
+ */
+
+void create_dense_matrix_1D(int N, int K, double **X)
+{
+
+    AUDIT printf("Creating dense matrix ...\n");
+    memory_allocation(double, N * K, *X);
+    //srand (time(NULL));
+    for (int j = 0; j < N; j++)
+    {
+        for (int z = 0; z < K; z++)
+        {
+            (*X)[j * K + z] =  (double)rand()/RAND_MAX;
+        }
+    }
+
+    AUDIT printf("Completed dense matrix creation...\n");
+}
+
 
 /**
  * compute_chunk_size - Computation of the size of the chunk to be assigned to each thread
@@ -334,7 +362,7 @@ double *transpose(int N, int K, double **A)
 {
     double *ret = NULL;
 
-    printf("Computing transpose for X ...\n");
+    AUDIT printf("Computing transpose for X ...\n");
 
     all_zeroes_memory_allocation(double, N *K, ret);
 

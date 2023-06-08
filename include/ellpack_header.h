@@ -2,7 +2,7 @@
 #define ELLPACK_HEADER_H
 
 #ifdef SAMPLINGS
-extern void computing_samplings_openMP(int, int, int *, int, int *, double **, int **, int);
+extern void computing_samplings_openMP(int, int, int, int *, double **, int **, int);
 #endif
 
 #ifdef CHECK_CONVERSION

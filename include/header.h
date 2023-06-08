@@ -59,6 +59,7 @@ extern int *compute_sum_nz(int, int *);
 extern void coo_general(int, int *, int *, int *, int **, int **, double **);
 extern void coo_symm(int, int *, int *, int *, int **, int **, double **);
 extern void create_dense_matrix(int, int, double ***);
+extern void create_dense_matrix_1D(int, int, double **);
 extern void free_y(int, double **);
 extern void free_CSR_data_structures(double *, int *, int *);
 extern void print_y(int, int, double **);

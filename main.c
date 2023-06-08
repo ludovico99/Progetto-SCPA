@@ -118,9 +118,7 @@ int main(int argc, char *argv[])
     double **X;
     MM_typecode matcode;
 
-#ifdef SAMPLINGS
-    int K[] = {3, 4, 8, 12, 16, 32, 64};
-#endif
+
     // nthread is the number of processors available to the device.
     nthread = omp_get_num_procs();
 
@@ -282,24 +280,22 @@ int main(int argc, char *argv[])
      */
 #ifdef OPENMP
 #ifdef CSR
-    computing_samplings_openMP(M, N, K, nz, as, ja, irp, nthread);
+    computing_samplings_openMP(M, N, nz, as, ja, irp, nthread);
 #elif ELLPACK
-    computing_samplings_openMP(M, N, K, nz, nz_per_row, values, col_indices, nthread);
+    computing_samplings_openMP(M, N, nz, nz_per_row, values, col_indices, nthread);
 #endif
 #endif
 
 #ifdef CUDA
-    int k = sizeof(K)/sizeof(int) - 1;
-    create_dense_matrix(N, K[k], &X);
 #ifdef CSR
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
-    y_parallel_cuda = CSR_GPU(M, N, K[k], nz, as, ja, irp, X, NULL);
+    samplings_GPU_CSR(M, N, nz, as, ja, irp);
 
 #elif ELLPACK
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
-    y_parallel_cuda = ELLPACK_GPU(M, N, K[k], nz, nz_per_row, values, col_indices, X, NULL);
+    samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
 
 #endif
     free(y_parallel_cuda);
@@ -338,7 +334,7 @@ int main(int argc, char *argv[])
 
 #elif CUDA
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
-    y_parallel_cuda = ELLPACK_GPU(M, N, K, nz, nz_per_row, values, col_indices, X, NULL);
+    y_parallel_cuda = ELLPACK_GPU(M, N, K, nz, nz_per_row, values, col_indices, X);
 
     /*The allocated memory is freed in the previous invokation*/
 #endif
@@ -361,7 +357,7 @@ int main(int argc, char *argv[])
 #elif CUDA
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
-    y_parallel_cuda = CSR_GPU(M, N, K, nz, as, ja, irp, X, NULL);
+    y_parallel_cuda = CSR_GPU(M, N, K, nz, as, ja, irp, X);
 
 #endif // CUDA
 

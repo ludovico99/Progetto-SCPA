@@ -18,8 +18,9 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 # to choose which implemented algorithms to use
 MODE = csr_adaptive
 #to do some sampling of the computed stats
-SAMPLING = no
+SAMPLING = yes
 
+OBJS = $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o  
 
 
 ifeq ($(MODE), csr)
@@ -34,8 +35,10 @@ endif
 
 ifeq ($(SAMPLING), yes)
 	DEFINES += -DSAMPLINGS
+	OBJS += $(objectsDir)/samplings.o
 else 
 	DEFINES += -DCORRECTNESS
+	OBJS += $(objectsDir)/checks.o
 endif
 
 all: build
@@ -61,6 +64,9 @@ $(objectsDir)/parallel_product_CSR.o: ./CUDA/parallel_product_CSR.cu
 $(objectsDir)/parallel_product_ELLPACK.o: ./CUDA/parallel_product_ELLPACK.cu
 	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
 
+$(objectsDir)/samplings.o: ./CUDA/samplings.cu
+	$(NVCC) $(COMPILER_CUDA) $(DEFINES) $(OPENMP) $(INCLUDES) $(FLAGS)  -o $@ -c $<
+
 $(objectsDir)/serial_product.o: serial_product.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
@@ -73,7 +79,7 @@ $(objectsDir)/checks.o: checks.c
 $(objectsDir)/create_mtx_coo.o: create_mtx_coo.c
 	$(NVCC) $(COMPILER_CPP) $(DEFINES) $(OPENMP) -o $@ -c $<
 
-$(binDir)/app: $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o $(objectsDir)/checks.o
+$(binDir)/app: $(OBJS)
 	mkdir -p $(binDir)
 	$(NVCC) $(OPENMP) $(DEFINES) $(LINK) $^ -o $@
 
@@ -99,19 +105,19 @@ openmp-ellpack-check-conversions:
 
 openmp-csr-serial-samplings:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) samplings.c -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE  $(SOURCES) openMP/samplings.c -o $(binDir)/app
 
 openmp-csr-parallel-samplings:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DCSR -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) openMP/samplings.c -o $(binDir)/app
 
 openmp-ellpack-serial-samplings:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_SERIAL -D_GNU_SOURCE $(SOURCES) openMP/samplings.c -o $(binDir)/app
 
 openmp-ellpack-parallel-samplings:
 	mkdir -p $(binDir)
-	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) samplings.c -o $(binDir)/app
+	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) openMP/samplings.c -o $(binDir)/app
 
 #------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
 
