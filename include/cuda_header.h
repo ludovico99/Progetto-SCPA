@@ -50,8 +50,11 @@ extern int *convert_2D_to_1D_per_ragged_matrix(int, int, int *, int **);
 
 #ifdef ELLPACK
 extern double *ELLPACK_GPU(int, int, int, int, int *, double **, int **, double **);
-extern __global__ void ELLPACK_kernel(const int, const int, int *, int *, double *, int *, double *, double *, int);
 extern void samplings_GPU_ELLPACK(int, int, int, int *, double **, int **);
+
+extern __global__ void ELLPACK_kernel(const int, const int, int *, int *, double *, int *, double *, double *);
+extern __global__ void ELLPACK_Sub_warp(const int , const int , int *, int *, double *, int *, double *, double *, const int);
+
 #elif CSR
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
 extern void samplings_GPU_CSR(int, int, int, double *, int *, int *);

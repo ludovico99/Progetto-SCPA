@@ -10,6 +10,7 @@
 #include <helper_timer.h> // For CUDA SDK timers
 #include "../include/header.h"
 
+/*------------------------------------------------------ CSR SCALAR --------------------------------------------------------------------------------------*/
 
 /**
  * CSR_kernel_v1 -  Product implementation between sparse matrix A and dense matrix X
@@ -168,6 +169,8 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
     }
 }
 
+/*------------------------------------------------------ CSR Vector with sub warp number of threads --------------------------------------------------------------------------------------*/
+
 /**
  * CSR_Vector_Sub_warp - Product implementation between sparse matrix A and dense matrix X
  *
@@ -179,7 +182,7 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
  *@param d_irp: Vector containing the column index of the first nonzero of rows
  *@param X: Dense matrix
  *@param d_y: Resulting matrix
- *@param sub_warp_size: Number of threads (at most 32) calculating an elementNumber of threads 
+ *@param sub_warp_size: Number of threads (at most 32) calculating an element 
  *
  */
 __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, const int sub_warp_size)
@@ -246,6 +249,8 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
         }
     }
 }
+
+/*------------------------------------------------------ CSR Vector --------------------------------------------------------------------------------------*/
 
 /**
  * CSR_Vector_Kernel - CSR vector implementation between sparse matrix A and dense matrix X
@@ -334,6 +339,8 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     }
 }
 
+
+/*------------------------------------------------------ CSR ADAPTIVE --------------------------------------------------------------------------------------*/
 
 /**
  * CSR_Adaptive_Kernel - CSR Adaptive implementation between sparse matrix A and dense matrix X
@@ -525,6 +532,8 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
     return ctr;
 }
 
+/*------------------------------------------------------ KERNEL SETUP --------------------------------------------------------------------------------------*/
+
 /**
  *
  * CSR_GPU - This function performs setups to launch the kernel:
@@ -614,8 +623,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Copy of the dense vector X from the Host to the Device*/
     memcpy_to_dev(h_X, d_X, double, N *K);
 
-    /*------------------------------------------------------ CSR ADAPTIVE --------------------------------------------------------------------------------------*/
-
     /* Number of threads per block */
     int threadsPerBlock = MAX_BLOCK_DIM;
 
@@ -637,12 +644,12 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
-    //int warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original CSR_vector
+    int warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original CSR_vector
 
-    int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
-    if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
+    // int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
+    // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 
-    int warpsPerBlock = threadsPerBlock / sub_warp_size; //<-- Per CSR_vector_sub_warp
+    // int warpsPerBlock = threadsPerBlock / sub_warp_size; //<-- Per CSR_vector_sub_warp
 
     /* Number of blocks per grid */
     int blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
@@ -675,9 +682,9 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #elif CSR_VECTOR
     //  /* CSR Vector */
-    //CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
-    CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
+    //CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
 
 #else
 

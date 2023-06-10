@@ -28,38 +28,115 @@
  *
  */
 
-__global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, int numElements)
+__global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y)
 {
+    const int num_elements = M * K;
+
     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Row of the item that the thread should compute */
-    int i = tid / K;
+    const int i = tid / K;
 
     /* Item column that the thread should compute */
-    int z = tid % K;
+    const int z = tid % K;
 
-    /* Partial result of matrix element Y */
-    double partial_sum = 0;
+    if (tid < num_elements)
+    {   
+        const int offset = sum_nz[i];
 
-    int offset = sum_nz[i];
-    if (tid < numElements)
-    {
-        if (nz_per_row[i] == 0)
-            d_y[i * K + z] = 0.0;
-        else
+        const int max_nz = nz_per_row[i];
+
+        /* Partial result of matrix element Y */
+        double partial_sum = 0.0;
+        for (int j = 0; j < max_nz; j++)
         {
-            for (int j = 0; j < nz_per_row[i]; j++)
+            if (d_values != NULL)
+                partial_sum += d_values[offset + j] * d_X[d_col_indices[offset + j] * K + z];
+            else
+                partial_sum += 1.0 * d_X[d_col_indices[offset + j] * K + z];
+        }
+        d_y[i * K + z] = partial_sum;
+    }
+}
+
+/**
+ * ELLPACK_Sub_warp - Product implementation between sparse matrix A and dense matrix X
+ *
+ *@param M: Number of rows of the matrix A
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param X: Dense matrix
+ *@param d_y: Resulting matrix
+ *@param sub_warp_size: Number of threads (at most 32) calculating an element 
+ *
+ */
+__global__ void ELLPACK_Sub_warp(const int M, const int K, int *nz_per_row, int *sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, const int sub_warp_size)
+{
+
+    __shared__ volatile double vals[MAX_BLOCK_DIM];
+
+    const int num_elements = M * K;
+
+    /* Thread identifier */
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    /* Global sub-warp Index */
+    const int sub_warp_id = tid / sub_warp_size;
+
+    const int lane = tid % sub_warp_size; // thread index within the sub_warp
+
+    /* Row of the item that the warp should compute */
+    const int i = sub_warp_id / K;
+
+    /* Column of the item that the warp should compute */
+    const int z = sub_warp_id % K;
+
+    vals[threadIdx.x] = 0.0;
+
+    if (sub_warp_id < num_elements)
+    {
+        const int offset = sum_nz[i];
+
+        const int max_nz = nz_per_row[i];
+
+        /* Partial result of matrix element Y */
+        double sum = 0.0;
+        for (int j = lane; j < max_nz; j += sub_warp_size)
+        {
+            if (d_values != NULL)
+                sum += d_values[offset + j] * d_X[d_col_indices[offset + j] * K + z];
+            else
+                sum += 1.0 * d_X[d_col_indices[offset + j] * K + z];
+        }
+
+        vals[threadIdx.x] = sum;
+
+        /**
+         * Parallel reduction in shared memory
+         */
+
+        for (int stride = sub_warp_size >> 1; stride > 0; stride >>= 1)
             {
-                if (d_values != NULL)
-                    partial_sum += d_values[offset + j] * d_X[d_col_indices[offset + j] * K + z];
-                else
-                    partial_sum += 1.0 * d_X[d_col_indices[offset + j] * K + z];
+                if (lane < stride)
+                    vals[threadIdx.x] += vals[threadIdx.x + stride];
             }
-            d_y[i * K + z] = partial_sum;
+
+        /**
+         * Only the first thread writes the result
+         */
+
+        if (lane == 0)
+        {
+            d_y[i * K + z] = vals[threadIdx.x];
         }
     }
 }
+
+
 /**
  *
  * ELLPACK_GPU - This function performs setups to launch the kernel:
@@ -159,10 +236,24 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     /* Number of elements of the product matrix Y */
     int numElements = M * K;
+
     /* Number of threads per block */
-    int threadsPerBlock = 1024;
+    int threadsPerBlock = MAX_BLOCK_DIM;
+
+#ifndef ELLPACK_SUB_WARP
+
     /* Number of blocks per grid */
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+
+#else 
+    int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
+    if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
+
+    int warpsPerBlock = threadsPerBlock / sub_warp_size;
+
+    /* Number of blocks per grid */
+    int blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
+#endif
 
     printf("CUDA kernel launch with %d blocks of %d threads\n", blocksPerGrid,
            threadsPerBlock);
@@ -173,7 +264,12 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
-    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, numElements);
+#ifndef ELLPACK_SUB_WARP
+    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y);
+#else
+    ELLPACK_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K, d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, sub_warp_size);
+#endif
+
     err = cudaGetLastError();
 
     if (err != cudaSuccess)

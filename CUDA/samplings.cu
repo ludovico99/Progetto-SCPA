@@ -11,7 +11,8 @@
 #ifdef CSR
 #define csr_scalar 0
 #define csr_vector 1
-#define csr_adaptive 2
+#define csr_vector_sub_warp 2
+#define csr_adaptive 3
 
 void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp)
 {
@@ -20,8 +21,8 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     cudaStream_t stream = NULL;
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
-    
-    int modes[] = {csr_scalar ,csr_vector, csr_adaptive };
+
+    int modes[] = {csr_scalar, csr_vector,csr_vector_sub_warp, csr_adaptive};
 
     FILE *f_samplings;
     /**
@@ -53,11 +54,13 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     int *d_rowBlocks = NULL;
 
     /* Number of threads per block */
-    int threadsPerBlock;
+    int threadsPerBlock = MAX_BLOCK_DIM;
     int blocksPerGrid;
     int numElements;
     int number_of_blocks;
     int warpsPerBlock;
+    int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
+    if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
@@ -93,7 +96,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
-    for (int k = 0; k < sizeof(K)/sizeof(int); k++)
+    for (int k = 0; k < sizeof(K) / sizeof(int); k++)
     {
 
         create_dense_matrix_1D(N, K[k], &h_X);
@@ -108,12 +111,16 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
         memcpy_to_dev(h_X, d_X, double, N *K[k]);
 
-        for (int i = 0; i < sizeof(modes)/sizeof(int); i++)
+         /* Number of elements of the product matrix Y */
+        numElements = M * K[k];
+
+        for (int i = 0; i < sizeof(modes) / sizeof(int); i++)
         {
 
             switch (i)
             {
             case csr_adaptive:
+
                 number_of_blocks = csr_adaptive_rowblocks(M, nz, h_irp, &rowBlocks, &threadsPerBlock);
 
                 // /* Device allocation for d_rowBlocks */
@@ -126,8 +133,6 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 break;
 
             case csr_scalar:
-                /* Number of elements of the product matrix Y */
-                numElements = M * K[k];
 
                 threadsPerBlock = MAX_BLOCK_DIM;
                 /* Number of blocks per grid */
@@ -135,27 +140,23 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
                 break;
             case csr_vector:
-                /* Number of elements of the product matrix Y */
-                numElements = M * K[k];
 
                 threadsPerBlock = MAX_BLOCK_DIM;
 
-                warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original csr_vector
-
-                /**
-                 * Per csr_vector_sub_warp
-                 */
-
-                // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
-                // if (sub_warp_size > WARP_SIZE)
-                //     sub_warp_size = WARP_SIZE;
-
-                // int warpsPerBlock = threadsPerBlock / sub_warp_size;
+                warpsPerBlock = threadsPerBlock / WARP_SIZE;
 
                 /* Number of blocks per grid */
                 blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
                 break;
+            case csr_vector_sub_warp:
 
+                threadsPerBlock = MAX_BLOCK_DIM;
+
+                warpsPerBlock = threadsPerBlock / sub_warp_size;
+
+                /* Number of blocks per grid */
+                blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
+                break;
             default:
                 printf("The mode is invalid\n");
                 exit(1);
@@ -181,13 +182,12 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                     CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
                     break;
                 case csr_vector:
-                    //  /* CSR Vector */
+                    /* CSR Vector */
                     CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
-
-                    // CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
-
                     break;
-
+                case csr_vector_sub_warp:
+                    CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
+                    break;
                 case csr_scalar:
                     /* Versione accesso alla memoria globale non ottimizzato */
                     // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
@@ -236,7 +236,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             case csr_vector:
                 fprintf(f_samplings, "csr_vector,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
-
+            case csr_vector_sub_warp:
+                fprintf(f_samplings, "csr_vector_sub_warp,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
             case csr_scalar:
                 fprintf(f_samplings, "csr_scalar,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
@@ -269,6 +271,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 }
 #elif ELLPACK
 
+#define ellpack 0
+#define ellpack_sub_warp 1
+
 void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **values, int **col_indices)
 {
     // Error code to check return values for CUDA calls
@@ -277,6 +282,8 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     cudaStream_t stream = NULL;
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
+
+    int modes[] = {ellpack, ellpack_sub_warp};
 
     FILE *f_samplings;
     /**
@@ -309,6 +316,12 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     int threadsPerBlock = MAX_BLOCK_DIM;
     int blocksPerGrid;
     int numElements;
+
+    // ELLPACK SUB WARP
+    int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
+    if (sub_warp_size > WARP_SIZE)
+        sub_warp_size = WARP_SIZE;
+    int warpsPerBlock = threadsPerBlock / sub_warp_size;
 
     float expireTimeMsec = 0.0;
 
@@ -352,7 +365,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
 
-    for (int k = 0; k < sizeof(K)/sizeof(int); k++)
+    for (int k = 0; k < sizeof(K) / sizeof(int); k++)
     {
         /* 2D to 1D dense matrix X conversion*/
         create_dense_matrix_1D(N, K[k], &h_X);
@@ -369,47 +382,87 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
 
         /* Number of elements of the product matrix Y */
         numElements = M * K[k];
-        /* Number of blocks per grid */
-        blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 
-        curr_Gflops = 0.0;
-        M2 = 0.0;
-        variance = 0.0;
-        Gflops = 0.0;
-
-        for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+        for (int i = 0; i < sizeof(modes) / sizeof(int); i++)
         {
-            printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid,
-                   threadsPerBlock);
-            // START TIMER
-            checkCudaErrors(cudaEventRecord(start, stream));
-
-            ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, numElements);
-
-            err = cudaGetLastError();
-            if (err != cudaSuccess)
+            switch (i)
             {
-                fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
-                        cudaGetErrorString(err));
-                exit(EXIT_FAILURE);
+            case ellpack:
+                /* Number of blocks per grid */
+                blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+                break;
+            case ellpack_sub_warp:
+                /* Number of blocks per grid */
+                blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
+                break;
+            default:
+                printf("The mode is invalid\n");
+                exit(1);
+                break;
             }
 
-            // STOP TIMER
-            checkCudaErrors(cudaEventRecord(stop, stream));
-            checkCudaErrors(cudaEventSynchronize(stop));
-            checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+            curr_Gflops = 0.0;
+            M2 = 0.0;
+            variance = 0.0;
+            Gflops = 0.0;
 
-            curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-            Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
-            M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+            for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+            {
+                printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid,
+                       threadsPerBlock);
+                // START TIMER
+                checkCudaErrors(cudaEventRecord(start, stream));
+                switch (i)
+                {
+                case ellpack:
+                    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y);
+                    break;
+                case ellpack_sub_warp:
+                    ELLPACK_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, sub_warp_size);
+                    break;
+                default:
+                    printf("The mode is invalid\n");
+                    exit(1);
+                    break;
+                }
+
+                err = cudaGetLastError();
+                if (err != cudaSuccess)
+                {
+                    fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
+                            cudaGetErrorString(err));
+                    exit(EXIT_FAILURE);
+                }
+
+                // STOP TIMER
+                checkCudaErrors(cudaEventRecord(stop, stream));
+                checkCudaErrors(cudaEventSynchronize(stop));
+                checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+
+                curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+                M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+            }
+
+            variance = M2 / (SAMPLING_SIZE - 1);
+
+            printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
+            switch (i)
+            {
+            case ellpack:
+                fprintf(f_samplings, "ellpack,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
+            case ellpack_sub_warp:
+                fprintf(f_samplings, "ellpack_sub_warp,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
+            default:
+                printf("The mode is invalid\n");
+                exit(1);
+                break;
+            }
+
+            fflush(f_samplings);
         }
-
-        variance = M2 / (SAMPLING_SIZE - 1);
-
-        printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
-
-        fprintf(f_samplings, "ellpack,%d, %lf,%.20lf\n", K[k], Gflops, variance);
-        fflush(f_samplings);
 
         free_memory_Cuda(d_X);
         free_memory_Cuda(d_y);
