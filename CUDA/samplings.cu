@@ -14,6 +14,20 @@
 #define csr_vector_sub_warp 2
 #define csr_adaptive 3
 
+
+/**
+ *
+ * samplings_GPU_CSR - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
+ * The overall results are written in a proper .csv file.
+ * 
+ * @param M: Number of rows
+ * @param N: Number of columns
+ * @param nz: Number of nz
+ * @param h_as: Coefficient vector
+ * @param h_ja: Column index vector
+ * @param h_irp: Vector of the start index of each row
+
+ */
 void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp)
 {
     cudaError_t err = cudaSuccess;
@@ -297,6 +311,22 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
 #define ellpack 0
 #define ellpack_sub_warp 1
+
+
+
+/**
+ *
+ * samplings_GPU_ELLPACK - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
+ * The overall results are written in a proper .csv file.
+ * 
+ * @param M: Number of rows
+ * @param N: Number of columns
+ * @param nz: Number of nz
+ * @param nz_per_row: Array containing the number of non-zeroes per row
+ * @param values: 2D array of coefficients
+ * @param col_indices: 2D array of column indexes
+
+ */
 
 void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **values, int **col_indices)
 {
