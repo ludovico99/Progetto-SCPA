@@ -25,11 +25,11 @@
  *@param d_y: Resulting matrix
  *@param numElements: Number of elements of the product matrix Y
  *
- * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
- * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
- * tramite 'thread_id % K'. In questa versione del prodotto la somma parziale non è
- * ottimizzata poiché abbiamo un accesso alla memoria globale ogni volta che modifichiamo
- * il risultato intermedio.
+* Each thread has the task of computing a single element of the final matrix Y.
+* Item row is computed via 'thread_id / K' while column
+* via 'thread_id %K'. In this version of the product the running sum is not
+* optimized since we have global memory access every time we edit
+* the intermediate result.
  */
 __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
@@ -74,11 +74,11 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
  *@param d_y: Resulting matrix
  *@param numElements: Number of elements of the product matrix Y
  *
- * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
- * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
- * tramite 'thread_id % K'. In questa versione del prodotto la somma parziale è
- * ottimizzata poiché evitiamo di accedere continuamente alla memoria globale durante
- * il calcolo del valore dell'elemento che il thread deve computare.
+  * Each thread has the task of computing a single element of the final matrix Y.
+  * Item row is computed via 'thread_id / K' while column
+  * via 'thread_id %K'. In this version of the product the running sum is
+  * optimized as we avoid continuously accessing global memory during
+  * the calculation of the value of the element that the thread must compute.
  */
 __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
@@ -129,10 +129,10 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
  *@param d_y: Resulting matrix
  *@param numElements: Number of elements of the product matrix Y
  *
- * Ogni thread ha il compito di computare un singolo elemento della matrice finale Y.
- * La riga dell'elemento viene computata tramite 'thread_id / K' mentre la colonna
- * tramite 'thread_id % K'. In questa versione del prodotto si vuole ottimizzare il numero di accessi a d_irp
- * andando a memorizzarne il valore in una variabile automatica.
+* Each thread has the task of computing a single element of the final matrix Y.
+* Item row is computed via 'thread_id / K' while column
+* via 'thread_id % K'. In this version of the product we want to optimize the number of accesses to d_irp
+* by storing its value in an automatic variable.
  */
 __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
 {
@@ -174,6 +174,11 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
 /**
  * CSR_Vector_Sub_warp - Product implementation between sparse matrix A and dense matrix X
  *
+ * 
+ * Each thread in a sub-warp computes a partial result for an element in y. 
+ * Throught shared memory some threads in a sub-warp perform parallel reduction.
+ * Only the first thread in the sub_warp writes the result in the resulting matrix 
+ * 
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
  *@param nz: Number of nz
@@ -255,6 +260,10 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
 /**
  * CSR_Vector_Kernel - CSR vector implementation between sparse matrix A and dense matrix X
  *
+ * Each thread in a warp computes a partial result for an element in y. 
+ * Throught shared memory some threads in a warp perform parallel reduction.
+ * Only the first thread in the warp writes the result in the resulting matrix 
+ * 
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
  *@param nz: Number of nz
@@ -344,7 +353,9 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
 
 /**
  * CSR_Adaptive_Kernel - CSR Adaptive implementation between sparse matrix A and dense matrix X
- *
+ * 
+ * CSR-Adapive is an algorithm that dynamically decides whether to use CSR-Stream or CSR-Vector
+ * 
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
  *@param nz: Number of nz
@@ -457,7 +468,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
 
 
 /**
- * csr_adaptive_rowblocks: This CPU code calculates the number of rows of a CSR matrix thta can fit in the shared memory
+ * csr_adaptive_rowblocks: This CPU code calculates the number of rows of a CSR matrix that can fit in the shared memory
  *
  *
  * @param M: Number of rows

@@ -15,6 +15,9 @@
  *
  * ELLPACK_kernel - Product implementation between sparse matrix A and dense matrix X
  *
+ * Each threads computes an element in the resulting matrix. 
+ * The row and the columns assigned to each thread depends on the global tid.
+ * 
  *@param M: Number of rows of the matrix A
  *@param N: Number of columns of the matrix A, Number of rows of the matrix X
  *@param K:  Number of columns of the matrix X
@@ -61,7 +64,11 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *s
 }
 
 /**
- * ELLPACK_Sub_warp - Product implementation between sparse matrix A and dense matrix X
+ * ELLPACK_Sub_warp - Product implementation between sparse matrix A and dense matrix X.
+ * 
+ * Each thread in a sub-warp computes a partial result for an element in y. 
+ * Throught shared memory some threads in a sub-warp perform parallel reduction.
+ * Only the first thread in the sub_warp writes the result in the resulting matrix 
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
@@ -71,7 +78,7 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *s
  *@param d_irp: Vector containing the column index of the first nonzero of rows
  *@param X: Dense matrix
  *@param d_y: Resulting matrix
- *@param sub_warp_size: Number of threads (at most 32) calculating an element 
+ *@param sub_warp_size: Number of threads (at most 32) that cooperates to compute an element.  
  *
  */
 __global__ void ELLPACK_Sub_warp(const int M, const int K, int *nz_per_row, int *sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, const int sub_warp_size)
@@ -246,9 +253,16 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 
 #else 
+    /**
+     * sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row
+    */
     int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
     if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 
+    /**
+     * Each sub warp computes an element. 
+     * we need as many blocks as the number of elements to calculate divided by the number of warps per block
+    */
     int warpsPerBlock = threadsPerBlock / sub_warp_size;
 
     /* Number of blocks per grid */
