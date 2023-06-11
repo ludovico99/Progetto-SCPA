@@ -10,7 +10,7 @@
 \author{Luca Capotombolo, Ludovico Zarrelli}
 
 %DATE
-\date{19 Maggio 2023}
+\date{1 Luglio 2023}
 
 % DOCUMENT
 \begin{document}
@@ -19,11 +19,111 @@
 
 \tableofcontents
 
+\clearpage
+
 \section{Introduzione}
-Nel progetto sono state utilizzate le matrici nel formato \textit{MatrixMarket}. Per determinare la tipologia di matrice rappresentata nel file Matrix Market sono state utilizzate le funzioni di I/O disponibili all'indirizzo:\\
+
+\subsection{Contesto}
+Il progetto prevede la realizzazione di un nucleo di calcolo per il prodotto tra una matrice sparsa ed un multivettore:
+
+Nel progetto sono state utilizzate le matrici nel formato \textit{MatrixMarket}. Per determinare la tipologia di matrice rappresentata nel file Matrix Market sono state utilizzate le funzioni di I/O disponibili all'indirizzo:
+\begin{center}
+\textit{Y = AX}
+\end{center}
+dove \textit{A} è una matrice sparsa memorizzata nei formati \textit{CSR} e \textit{ELLPACK}. Il nucleo di calcolo è stato sviluppato in C ed è stato parallelizzato per sfruttare le risorse di calcolo disponibili con parallelizzazione \textit{OpenMP} e \textit{CUDA}.
+
+\subsection{Matrici di test}
+Per quanto riguarda le matrici di test, sono state scaricate nel formato \textit{Matrix Market} e sono state utilizzate le funzioni per l'I/O disponibili all'indirizzo:
 
 \begin{center}
 \textit{http://math.nist.gov/MatrixMarket/}
 \end{center}
+
+\subsection{Implementazione Seriale}
+I risultati ottenuti dall'esecuzione parallela SpMM sono stati confrontati direttamente con i risultati ottenuti dall'esecuzione seriale. Per quanto riguarda le implementazioni seriali, sono state sviluppate tre different versioni:
+
+\begin{itemize}
+\item Prodotto seriale utilizzando il formato CSR
+\item Prodotto seriale utilizzando il formato ELLPACK con \textit{zero padding}
+\item Prodotto seriale utilizzando il formato ELLPACK senza \textit{zero padding}
+\end{itemize}
+
+Per avere una misura dell'errore, abbiamo deciso di calcolare due differenti errori che ci forniscono diverse informazioni:
+\begin{itemize}
+\item \textit{X}: mi fornisce delle informazioni su
+\item \textit{Y}: mi fornisce delle informazioni su
+\end{itemize}
+
+\section{Funzioni ausiliarie per il preprocessamento dei dati}
+La funzione \textit{create\_matrix\_coo} ha il compito di leggere i dati da uno specifico file nel formato \textit{MatrixMarket} per poi allocare e popolare la matrice nel formato \textit{COO}. All'interno di questa funzione vengono gestite le possibili tipologie di matrici che sono supportate dal programma:
+
+\begin{itemize}
+\item \textit{Simmetrica Pattern}
+\item \textit{Simmetrica Reale}
+\item \textit{Generale Pattern}
+\item \textit{Generale Reale}
+\end{itemize}
+
+Le strutture dati che vengono utilizzate per la rappresentazione della matrice \textit{COO} sono le seguenti:
+
+\begin{itemize}
+\item \textit{I}: array contenente gli indici di riga degli elementi non zero
+\item\textit{J}: array contenente gli indici di colonna degli elementi non zero
+\item \textit{val}: array contenente i valori degli elementi non zero
+\end{itemize}
+
+In questo modo, l'elemento \textit{i-esimo} di questi tre array rappresenta rispettivamente l'indice di riga, l'indice di colonna e il valore di uno specifico elemento non zero della matrice.
+
+\section{Discussione implementazione CSR}
+Passiamo alla discussione relativa al formato CSR. Vedremo gli aspetti riguardanti la conversione della matrice dal formato \textit{COO} al formato \textit{CSR} e gli aspetti che riguardano il prodotto SpMM sia con \textit{OpenMP} che con \textit{CUDA}.
+
+\subsection{Funzioni ausiliarie per la memorizzazione nel formato CSR}
+Le strutture dati che vengono utilizzate per il formato \textit{CSR} sono le seguenti:
+
+\begin{itemize}
+\item \textit{as}: è l'array dei coefficienti non zero
+\item \textit{ja}: è l'array degli indici di colonna dei coefficienti non zero
+\item \textit{irp}: è l'array dei puntatori all'inizio di ciascuna riga
+\end{itemize}
+
+Durante lo sviluppo del progetto, abbiamo avuto delle difficoltà nella conversione della matrice dal formato \textit{COO} al formato \textit{CSR}. Più precisamente, le nostre difficoltà erano dovute al grande tempo richiesto per eseguire la convesione per le matrici di grande dimensione.\\
+La prima implementazione dell'algoritmo di conversione è rappresentata dalla funzione \textit{coo\_to\_CSR\_parallel} che si comporta bene per le matrici di piccole/medie dimensione ma ha un tempo di esecuzione elevato per la matrici di grande dimensione. Il primo step dell'algoritmo consiste nel computare il numero di non zeri per ogni riga popolando la struttura dati di appoggio \textit{nz\_per\_row} che poi viene utilizzare per inizializzare la struttura dati \textit{irp}. A questo punto, le tre strutture dati precedentemente elencate vengono popolate utilizzando un doppio ciclo \textit{for}. Per velocizzare l'esecuzione, questo blocco di codice è stato parallelizzato cercando di bilanciare il più possibile il carico di lavoro. Per liberare la memoria precedentemente occupata, al termine dell'inizializzazione delle tre strutture dati \textit{as, ja} e \textit{irp} vengono deallocate le strutture dati per la rappresentazione nel formato \textit{COO}. (Da sistemare il codice con quel -1)\\
+Il problema della prima implementazione è probabilmente rappresentato dalla presenza dei due cicli for. Per ridurre il tempo richiesto nella conversione dal formato \textit{COO} al formato \textit{CSR} in modo da trattare anche le matrici molto grandi, abbiamo deciso di implementare una seconda versione dell'algoritmo di conversione nella funzione \textit{coo\_to\_CSR\_parallel\_optimization}. Il vantaggio di questa seconda versione consiste nell'utilizzo di un singolo ciclo che va ad iterare su tutti i non zeri della matrice. Per gestire la concorrenza, abbiamo introdotto una minima sezione critica che, comunque, ci consente di avere dei tempi di esecuzione molto inferiori rispetto alla versione precedente.
+
+\subsection{OpenMP}
+Il prodotto parallelo per il formato \textit{CSR} con parallelizzazione \textit{OpenMP} è implementato nella funzione \textit{parallel\_product\_CSR}. La funzione \textit{compute\_chunk\_size} ha il compito di calcolare la dimensione del chunk che deve essere assegnato a ciascun thread. Lo spazio delle iterazioni viene suddiviso a seconda del numero di processori che sono disponibili sul device. L'obiettivo è quello di assegnare un blocco di righe contiguo ai threads nello spazio di iterazione in modo da evita il più possibile il problema del \textit{False Cache Sharing}. Ad ogni thread viene associato un certo numero di righe e ogni riga è associata ad un unico thread. In questo modo, posso utilizzare una variaibile privata \textit{partial\_sum} per computare le somme parziali.
+
+\subsection{CUDA}
+Per quanto riguarda il prodotto parallelo per il formato \textit{CSR} in \textit{CUDA}, abbiamo deciso di scrivere differenti versioni del kernel. In realtà, le prime tre versioni del kernel potrebbero essere viste come la stessa versione con solamente delle modifiche minimali che le distinguono. Abbiamo deciso di riportare queste modifiche minimali differenziando così le tre versioni del kernel poiché hanno un grande impatto prestazionale. Poiché stiamo facendo calcolo ad alte prestazioni, è importante notare come queste differenze, che sembrano essere minimali, in realtà hanno un gran peso sulle prestazioni.\\
+L'idea che c'è dietro alle prime tre versioni del kernel è quella di far sì che un singolo thread computi un singolo elemento della matrice finale \textit{Y}. Inizialmente, viene allocata la memoria necessaria sul \textit{CUDA Device} e vengono copiati i dati dall'host verso il device. Il numero di threads per blocco che viene utilizzato è pari a \textit{1024}. Nel kernel vengono calcolati gli indici di riga e di colonna che identificano l'elemento che deve essere calcolato dal thread. Come primo step viene calcolato l'identificativo globale del thread. Successivamente, vengono calcolati i due indici nel seguente modo:
+
+\begin{center}
+\item \textit{row = tid / K}
+\item \textit{col = tid \% K}
+\end{center}
+
+Una volta determinata la riga \textit{row} della matrice sparsa \textit{A} e la colonna \textit{col} della matrice densa \textit{X}, viene eseguito un controllo per verificare se il thread sta calcolando effettivamente un elemento della matrice. Questo controllo mi consente di gestire una griglia di blocchi che ha un numero totale di threads strettamente maggiore del numero di elementi della matrice che bisogna calcolare.\\
+La prima versione del kernel non è ottimizzata poiché nel calcolo del singolo prodotto scalare si accede in memoria ogni volta che il thread modifica il risultato intermedio. Questi accessi continui portano a delle prestazioni molto basse. Un modo evidente per risolvere questo problema prestazionale consiste nello scrivere in memoria direttamente il risultato finale della computazione rappresentato dal valore della variabile \textit{partial\_sum}. Questa modifica permette di aumentare notevolmente le prestazioni del prodotto parallelo. A questo punto, è stata apportata un'ulteriore modifica minimale che consiste nel pre-computarsi le due variabili \textit{start} e \textit{end} e successivamente eseguire il ciclo. La terza versione riesce a guadagnare in termini prestazionali rispetto alla seconda versione.\\
+
+Dopo aver implementato queste tre versioni del kernel abbiamo provato a distribuire la computazione richiesta per il calcolo di un singolo elemento della matrice. Questa quarta versione è stata ispirata al \textit{CSR Vector} descritto nei vari paper. L'idea è quella di distribuire il calcolo di un elemento della matrice finale Y tra i threads di uno stesso warp. Più precisamente, ogni thread in un warp computa un risultato parziale per uno stesso elemento \textit{y} della matrice \textit{Y}. Viene eseguita una riduzione parallela che coinvolge i thread di uno stesso warp sfruttando la \textit{shared memory}. Poiché tutti i threads di un warp contribuiscono al calcolo dello stesso elemento, è sufficiente che un solo thread tra essi scriva il risultato ottenuto dalla riduzione in memoria globale. Per fare ciò, abbiamo deciso che solamente il thread con identificativo \textit{0} all'interno del warp ha il compito di scrivere il risultato in memoria globale. Tuttavia, questa nuova versione del kernel ci ha portato ad una notevole riduzione delle prestazioni. Il motivo per cui le prestazioni si sono ridotte così drasticamente è dovuto al numero molto piccolo di non zeri per riga. Facendo un'analisi generale delle matrici di test, abbiamo potuto osservare come gran parte di esse abbiano un numero di non zeri medio che è inferiore rispetto alla dimensione del warp. Questo implica il fatto che ci siano mediamente un numero non piccolo di thread all'interno di un warp che non danno un contributo effettivo al calcolo dell'elemento.\\
+
+Nelle prime tre versioni, ogni elemento veniva computato da un singolo thread che eseguiva il prodotto scalare riga \textit{row} per colonna \textit{cols}. Nella versione successiva, invece di utilizzare un unico thread, abbiamo provato a distribuire la computazione tra i differenti thread di uno stesso warp. Tuttavia, abbiamo visto che assegnando un singolo warp alla computazione di un singolo elemento \textit{y} della matrice finale \textit{Y} si ha una grande perdita nelle prestazioni. A questo punto, abbiamo pensato di seguire un approccio intermedio che consiste nel vedere i due casi implementati finora come dei \textit{casi estremi}. Invece di assegnare un thread per elemento o un warp per elemento abbiamo provato a scegliere un numero intermedio di thread come compromesso tra i due differenti approcci.\\
+
+Più precisamente, dato un \textit{warp} di 32 thread, abbiamo creato 16 differenti \textit{subwarps}, ognuno con il compito di computare un singolo elemento della matrice finale \textit{Y}. Di conseguenza, ogni elemento \textit{y} della matrice finale \textit{Y} è computato da due differenti threads che costituiscono il subwarp. Nella versione \textit{CSR\_Vector\_Sub\_warp} si ragiona in termini di identificativo del subwarp. Come primo step si determina l'identificativo globale del thread per poi computare l'identificativo globale del \textit{subwarp} a cui il thread appartiene. Poiché un \textit{subwarp} ha una dimensione pari a \textit{2}, ogni thread che appartiene al \textit{subwarp} ha un proprio identificativo locale al suo interno. Più precisamente, se la dimensione è pari a \textit{2} allora i possibili indici dei threads all'interno di un subwarp sono \textit{0} e \textit{1}. Dopo aver calcolato l'indice del subwarp è possibile determinare la riga e la colonna dell'elemento della matrice assegnato al subwarp. Poiché il subwarp si occupa di computare le somme parziali per un singolo elemento della matrice \textit{Y} allora possiamo utilizzare direttamente una sola area di memoria associata ad ogni thread. Da notare che questo non sarebbe stato possibile se il subwarp avesse calcolato più elementi distinti della matrice finale \textit{Y}. In questo caso, sarebbe stato necessario un meccanismo che permettesse di distinguere le somme parziali per i differenti elementi. In questo kernel viene utilizzata la \textit{shared memory} per mantenere i risultati delle somme parziali. Più precisamente, ad ogni thread viene assegnata una specifica entry nell'array \textit{vals} in cui mantenere i risultati delle somme parziali per il calcolo dell'elemento. Dopo aver calcolato i propri contributi, viene eseguita una riduzione parallela nella memoria condivisa. Infine, solamente il thread con indice \textit{0} all'interno del subwarp scriverà il risultato in memoria globale.
+
+\section{Discussione implementazione ELLPACK}
+
+\subsection{Funzioni ausiliarie per la memorizzazione nel formato ELLPACK}
+
+\subsection{OpenMP}
+
+\subsection{CUDA}
+
+\section{Misurazione delle prestazioni}
+
+\section{Suddivisione del lavoro}
+
+\section{Istruzioni per la compilazione}
+
 
 \end{document}
