@@ -16,9 +16,9 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
 
 # to choose which implemented algorithms to use
-MODE = ellpack_sw
+MODE = csr_vector_sub_warp
 #to do some sampling of the computed stats
-SAMPLING = yes
+SAMPLING = no
 
 OBJS = $(objectsDir)/main.o $(objectsDir)/mmio.o $(objectsDir)/conversions_parallel.o $(objectsDir)/parallel_product_CSR.o $(objectsDir)/parallel_product_ELLPACK.o $(objectsDir)/serial_product.o $(objectsDir)/utils.o $(objectsDir)/create_mtx_coo.o  
 
@@ -29,6 +29,8 @@ else ifeq ($(MODE), csr_adaptive)
     DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE
 else ifeq ($(MODE), csr_vector) 
 	DEFINES = -DCUDA -DCSR -DCSR_VECTOR
+else ifeq ($(MODE), csr_vector_sub_warp) 
+	DEFINES = -DCUDA -DCSR -DCSR_VECTOR_SUB_WARP
 else ifeq ($(MODE), ellpack_sw) 
  	DEFINES = -DCUDA -DELLPACK -DELLPACK_SUB_WARP
 else 

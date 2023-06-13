@@ -92,7 +92,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
     int z = tid % K;
 
     /* Partial result of matrix element Y */
-    double partial_sum = 0;
+    double partial_sum = 0.0;
 
     if (tid < numElements)
     {
@@ -146,7 +146,7 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
     int z = tid % K;
 
     /* Partial result of matrix element Y */
-    double partial_sum = 0;
+    double partial_sum = 0.0;
 
     if (tid < numElements)
     {
@@ -489,21 +489,21 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
     (*rowBlocks)[0] = 0;
     int sum_nz = 0, last_i = 0, ctr = 1;
 
-    // int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
-    // int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
+    int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
+    int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
 
-    // int local_size = max_size;
+    int local_size = max_size;
 
-    // if (local_size % WARP_SIZE != 0)
-    //     local_size += WARP_SIZE - (local_size % WARP_SIZE);
+    if (local_size % WARP_SIZE != 0)
+        local_size += WARP_SIZE - (local_size % WARP_SIZE);
 
-    // if (local_size > MAX_BLOCK_DIM)
-    //     local_size = MAX_BLOCK_DIM;
+    if (local_size > MAX_BLOCK_DIM)
+        local_size = MAX_BLOCK_DIM;
 
     // Computing the average number of non-zeroes per row 
-    int local_size = pow(2,floor(log2((nz + M - 1)/ M)));
-    if (local_size < WARP_SIZE) local_size = WARP_SIZE;
-    if (local_size > MAX_BLOCK_DIM) local_size = MAX_BLOCK_DIM;
+    // int local_size = pow(2,floor(log2((nz + M - 1)/ M)));
+    // if (local_size < WARP_SIZE) local_size = WARP_SIZE;
+    // if (local_size > MAX_BLOCK_DIM) local_size = MAX_BLOCK_DIM;
 
     for (int i = 1; i <= M; i++)
     {
@@ -651,16 +651,24 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     int blocksPerGrid = (number_of_blocks - 1) * K;
 
 #elif CSR_VECTOR
-
-    /* Number of elements of the product matrix Y */
+     /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
     int warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original CSR_vector
+    
+     /* Number of blocks per grid */
+    int blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
+
+#elif CSR_VECTOR_SUB_WARP
+   
+      /* Number of elements of the product matrix Y */
+    int numElements = M * K;
 
     // int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
     // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 
-    // int warpsPerBlock = threadsPerBlock / sub_warp_size; //<-- Per CSR_vector_sub_warp
+    int sub_warp_size = 2;
+    int warpsPerBlock = threadsPerBlock / sub_warp_size;
 
     /* Number of blocks per grid */
     int blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
@@ -692,11 +700,13 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     //CSR_Adaptive_Kernel_v2<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
 
 #elif CSR_VECTOR
-    //  /* CSR Vector */
+
+    /* CSR Vector */
     CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
-    //CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
+#elif CSR_VECTOR_SUB_WARP
 
+    CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
 #else
 
     /* Versione accesso alla memoria globale non ottimizzato */

@@ -85,15 +85,15 @@ int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
      */
 
     /**
-     * WARNING: In questa conversione parallela gli array as e ja in diverse iterazioni rimangono invariati
-     * poichè il thread i-esimo va a modificare la componente (my_offset), variabile privata per i. Di conseguenza,
-     * il risultato del prodotto matrice-vettore, nonostante non sia commutativo in aritmetica floating point, rimane invariato
-     * in diverse esecuzioni.
+     * WARNING: Utilizzando questa conversione parallela, in ogni esecuzione del programma, fissata la riga i-esima della matrice sparsa, i suoi 
+     * elementi compariranno negli array as e ja nello stesso ordine per ogni riga i. Questo è dovuto al fatto che non c'è parallelismo nel costruire le strutture dati fissata la riga i,
+     * poichè gli elementi di ogni riga sono affidati ad un solo thread. 
+     * Di conseguenza, il risultato del prodotto matrice-vettore, nonostante non sia associativo in aritmetica floating point, rimane invariato in diverse esecuzioni.
      */
 
     for (int i = 0; i < M; i++)
     {
-        int not_empty = 0;
+
         int num_first_nz_current_row; // It's the index in the vectors as and ja of the first not zero for each row
         int my_offset = (*irp)[i];    // my_offset is the index of the first not zero for each row too
 
@@ -105,11 +105,8 @@ int *coo_to_CSR_parallel(int M, int N, int nz, int *I, int *J, double *val, doub
                     (*as)[my_offset] = val[j];
                 (*ja)[my_offset] = J[j];
                 my_offset++; // Throught the variable my_offset the thread assigned to the i-th row iterates on as and ja
-                not_empty = 1;
             }
         }
-        if (!not_empty)
-            (*irp)[i] = -1;
     }
 
     /**
@@ -201,13 +198,13 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
     for (int i = 0; i < nz; i++)
     {
         /**
-         * WARNING: In questa conversione parallela gli array irp e as in diverse iterazioni possono cambiare
-         * poichè il thread i-esimo e un altro thread j, in concorrenza, possono essere responsabili di diversi elementi (I[i], J[i], val [i] <-->
-         * I[j] == I[i], J[j], val [j])della stessa riga (I[i] == I[j]).
-         * La variabile idx, che è l'indice all'interno dell'array as in corrispondenza del quale assegnare elemento corrente,
-         * è uguale per entrambi. E' possibile quindi, che in diverse esecuzioni, l'elemento x sia posizionato in posizione (idx) dal thread i
-         * oppure che l'elemento y sia posizionato in (idx) dal thread j. "Vince" chi accede prima al blnz_per_rowo critical.
-         * Di conseguenza, il risultato del prodotto matrice-vettore, poichè è commutativo in aritmetica floating point, cambia in diverse esecuzioni.
+         * WARNING: In questo caso, invece, piu thread in parallelo possono popolare le strutture dati con le informazioni di una stessa riga. 
+         * Di conseguenza, gli elementi di una stessa riga potrebbero apparire nelle strutture dati in un ordine differente nelle diverse esecuzioni del programma.
+         * Infatti, la variabile idx, che è l'indice all'interno dell'array as in corrispondenza del quale assegnare elemento corrente per la riga row, potrebbe essere uguale per piu thread.
+         * Ad esempio, se due thread si ritrovano a dover inserire un elemento per la stessa riga row, il primo che accede al blocco critical lo inserirà in posizione idx. 
+         * Di conseguenza, a causa dell'interleave, fissata la riga, è possibile avere piu ordinamenti nelle strutture dati.
+         * E' possibile quindi, che in diverse esecuzioni, l'elemento x sia posizionato in posizione (idx) dal thread i oppure che l'elemento y sia posizionato in (idx) dal thread j. 
+         * Di conseguenza, il risultato del prodotto matrice-vettore, poichè non è associativo in aritmetica floating point, cambia in diverse esecuzioni.
          */
 
         int row = I[i];
@@ -276,28 +273,6 @@ int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, d
     chunk_size = compute_chunk_size(M, nthread);
 
     /**
-     * Allocating memory for the ELLPACK 2D data structures
-     */
-    if (val != NULL)
-    {
-        memory_allocation(double *, M, *values);
-
-        for (int k = 0; k < M; k++)
-        {
-            memory_allocation(double, max_so_far, (*values)[k]);
-        }
-    }
-
-    memory_allocation(int *, M, *col_indices);
-
-    for (int k = 0; k < M; k++)
-    {
-        memory_allocation(int, max_so_far, (*col_indices)[k]);
-    }
-
-    printf("Malloc for ELLPACK data structures completed\n");
-
-    /**
      * Calculates the maximum number of non-zero elements across all rows
      */
 #pragma omp parallel shared(I, J, val, max_so_far, M, nz, chunk_size) firstprivate(max_nz_per_row) private(nz_in_row) num_threads(nthread) default(none)
@@ -322,6 +297,29 @@ int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, d
     }
 
     printf("MAX_NZ_PER_ROW is %d\n", max_so_far);
+
+     /**
+     * Allocating memory for the ELLPACK 2D data structures
+     */
+    if (val != NULL)
+    {
+        memory_allocation(double *, M, *values);
+
+        for (int k = 0; k < M; k++)
+        {
+            memory_allocation(double, max_so_far, (*values)[k]);
+        }
+    }
+
+    memory_allocation(int *, M, *col_indices);
+
+    for (int k = 0; k < M; k++)
+    {
+        memory_allocation(int, max_so_far, (*col_indices)[k]);
+    }
+
+    printf("Malloc for ELLPACK data structures completed\n");
+
 
     /**
      * Fills ELLPACK arrays with values and corresponding column indexes

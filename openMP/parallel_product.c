@@ -199,7 +199,7 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
 
                 y[i][z] = partial_sum;
 
-                if (j < max_nz_per_row - 2)
+                if (j <= max_nz_per_row - 2)
                 {
                     if (ja[i][j] == ja[i][j + 1]) // It means that the i - th row has no more zeros
                         break;

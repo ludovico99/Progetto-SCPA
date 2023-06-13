@@ -77,9 +77,13 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     int number_of_blocks;
     /* Number of warps per block*/
     int warpsPerBlock;
-    /* sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
-    int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
-    if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
+
+    // /* sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
+    // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
+    // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
+
+    int sub_warp_size = 2;
+
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
