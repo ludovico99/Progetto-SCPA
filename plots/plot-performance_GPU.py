@@ -73,7 +73,7 @@ def print_all_results_CSR():
                     color='green', alpha=0.1,
                     label="Confidence band of 95 for CSR ADAPTIVE")
 
-    ax.legend(loc='upper right', shadow=True, fontsize=10)
+    ax.legend(loc='upper left', shadow=True, fontsize=10)
 
     plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO CSR)",
               fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')

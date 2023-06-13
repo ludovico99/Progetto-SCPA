@@ -4,10 +4,10 @@
 #include <cuda_runtime.h> // For CUDA runtime API
 
 #ifdef SAMPLINGS
-#define SAMPLING_SIZE 3
+#define SAMPLING_SIZE 10
 #endif
 
-#define MAX_BLOCK_DIM 1024
+#define MAX_BLOCK_DIM 512
 #define WARP_SIZE 32
 
 #define memory_allocation_Cuda(tipo, dimensione, puntatore)                                              \
@@ -59,9 +59,9 @@ extern __global__ void ELLPACK_Sub_warp(const int , const int , int *, int *, do
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
 extern void samplings_GPU_CSR(int, int, int, double *, int *, int *);
 
-extern __global__ void CSR_kernel_v1(const int, const int, const int, double *, int *, int *, double *, double *, int);
-extern __global__ void CSR_kernel_v2(const int, const int, const int, double *, int *, int *, double *, double *, int);
-extern __global__ void CSR_kernel_v3(const int, const int, const int, double *, int *, int *, double *, double *, int);
+extern __global__ void CSR_kernel_v1(const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_kernel_v2(const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_kernel_v3(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Vector_Sub_warp(const int, const int, const int, double *, int *, int *, double *, double *, const int);
 extern __global__ void CSR_Vector_Kernel(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Adaptive_Kernel(const int, const int, const int, double *, int *, int *, double *, double *, int *);

@@ -16,7 +16,7 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
 
 # to choose which implemented algorithms to use
-MODE = csr_vector_sub_warp
+MODE = csr_vector
 #to do some sampling of the computed stats
 SAMPLING = no
 
@@ -200,6 +200,9 @@ copy-deviceQuery:
 
 copy-code:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/ $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)
+
+copy-headers:
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/include $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)
 
 copy-make:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/Makefile $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/

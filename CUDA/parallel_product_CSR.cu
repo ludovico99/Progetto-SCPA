@@ -23,7 +23,6 @@
  *@param d_irp: Vector containing the column index of the first nonzero of rows
  *@param X: Dense matrix
  *@param d_y: Resulting matrix
- *@param numElements: Number of elements of the product matrix Y
  *
 * Each thread has the task of computing a single element of the final matrix Y.
 * Item row is computed via 'thread_id / K' while column
@@ -31,10 +30,12 @@
 * optimized since we have global memory access every time we edit
 * the intermediate result.
  */
-__global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
+__global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const int num_elements = M * K;
 
     /* Row of the item that the thread should compute */
     int i = tid / K;
@@ -42,7 +43,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
     /* Item column that the thread should compute */
     int z = tid % K;
 
-    if (tid < numElements)
+    if (tid < num_elements)
     {
         if (i < M - 1 && d_irp[i] == d_irp[i + 1])
         {
@@ -80,10 +81,12 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
   * optimized as we avoid continuously accessing global memory during
   * the calculation of the value of the element that the thread must compute.
  */
-__global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
+__global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const int num_elements = M * K;
 
     /* Row of the item that the thread should compute */
     int i = tid / K;
@@ -94,7 +97,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
     /* Partial result of matrix element Y */
     double partial_sum = 0.0;
 
-    if (tid < numElements)
+    if (tid < num_elements)
     {
 
         if (i < M - 1 && d_irp[i] == d_irp[i + 1])
@@ -111,6 +114,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
                 else
                     partial_sum += 1.0 * d_X[d_ja[j] * K + z];
             }
+
             d_y[i * K + z] = partial_sum;
         }
     }
@@ -134,10 +138,12 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
 * via 'thread_id % K'. In this version of the product we want to optimize the number of accesses to d_irp
 * by storing its value in an automatic variable.
  */
-__global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int numElements)
+__global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    const int num_elements = M * K;
 
     /* Row of the item that the thread should compute */
     int i = tid / K;
@@ -148,7 +154,7 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
     /* Partial result of matrix element Y */
     double partial_sum = 0.0;
 
-    if (tid < numElements)
+    if (tid < num_elements)
     {
         int start = d_irp[i];
         int end = 0;
@@ -343,7 +349,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
 
         if (lane == 0)
         {
-            d_y[i * K + z] += vals[threadIdx.x];
+            d_y[i * K + z] = vals[threadIdx.x];
         }
     }
 }
@@ -489,28 +495,26 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
     (*rowBlocks)[0] = 0;
     int sum_nz = 0, last_i = 0, ctr = 1;
 
-    int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
-    int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
+    // int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
+    // int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
 
-    int local_size = max_size;
+    // int local_size = max_size;
 
-    if (local_size % WARP_SIZE != 0)
-        local_size += WARP_SIZE - (local_size % WARP_SIZE);
+    // if (local_size % WARP_SIZE != 0)
+    //     local_size += WARP_SIZE - (local_size % WARP_SIZE);
 
-    if (local_size > MAX_BLOCK_DIM)
-        local_size = MAX_BLOCK_DIM;
+    // if (local_size > MAX_BLOCK_DIM)
+    //     local_size = MAX_BLOCK_DIM;
 
     // Computing the average number of non-zeroes per row 
-    // int local_size = pow(2,floor(log2((nz + M - 1)/ M)));
-    // if (local_size < WARP_SIZE) local_size = WARP_SIZE;
-    // if (local_size > MAX_BLOCK_DIM) local_size = MAX_BLOCK_DIM;
+    int local_size = pow(2,floor(log2((nz + M - 1)/ M)));
+    if (local_size < WARP_SIZE) local_size = WARP_SIZE;
+    if (local_size > MAX_BLOCK_DIM) local_size = MAX_BLOCK_DIM;
 
     for (int i = 1; i <= M; i++)
-    {
-        if (i == M)
-            sum_nz += nz - irp[i - 1];
-        else
-            sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in this row
+    {   
+        if (i == M)  sum_nz += nz - irp[i - 1];
+        else sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in the i-th row
 
         if (sum_nz == local_size)
         { // The row fills up to LOCAL SIZE
@@ -535,9 +539,10 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
             last_i = i;
             sum_nz = 0;
         }
+        else if (i == M) (*rowBlocks)[ctr++] = M; //Inserting last start row if it has not been previuosly inserted 
+       
     }
 
-    (*rowBlocks)[ctr++] = M;
     *threadsPerBlock = local_size;
 
     return ctr;
@@ -604,14 +609,14 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     h_X = convert_2D_to_1D(N, K, X);
 
     /* Y array host memory allocation */
-    memory_allocation(double, M *K, h_y);
+    memory_allocation(double, M * K, h_y);
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
     /* Y array host memory allocation */
-    memory_allocation_Cuda(double, M *K, d_y);
+    memory_allocation_Cuda(double, M * K, d_y);
     /* Device allocation for dense matrix X */
-    memory_allocation_Cuda(double, N *K, d_X);
+    memory_allocation_Cuda(double, N * K, d_X);
     if (h_as != NULL)
         /* Device allocation for the as vector containing non-zero elements */
         memory_allocation_Cuda(double, nz, d_as);
@@ -640,6 +645,16 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #ifdef CSR_ADAPTIVE
 
     int number_of_blocks = csr_adaptive_rowblocks(M, nz, h_irp, &rowBlocks, &threadsPerBlock);
+
+
+    // for (int i = 0; i < number_of_blocks; i++){
+    //     printf("%d\n", rowBlocks[i]);
+    // }
+    // printf("\n");
+    // for (int i = 0; i < number_of_blocks - 1; i++){
+    //     if (rowBlocks[i + 1] == M) printf("%d\n", nz - h_irp[rowBlocks[i]]);
+    //     else printf("%d\n", h_irp[rowBlocks[i + 1]] - h_irp[rowBlocks[i]]);
+    // }
 
     // /* Device allocation for d_rowBlocks */
     memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -710,12 +725,12 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #else
 
     /* Versione accesso alla memoria globale non ottimizzato */
-    // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
-    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
     /* Versione accesso alla memoria globale ottimizzato */
-    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, numElements);
+    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y,);
 
 #endif // CSR_ADAPTIVE
 
