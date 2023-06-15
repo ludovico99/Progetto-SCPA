@@ -172,7 +172,7 @@ __global__ void ELLPACK_Sub_warp(const int M, const int K, int *nz_per_row, int 
  *@param X: Dense matrix
  *@param time: Pointer to a double representing the time elapsed for the GPU product
  *
- * Returns the resulting/product matrix computed by the GPU kernel
+ * @returns the resulting/product matrix computed by the GPU kernel
  */
 
 double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **values, int **col_indices, double **X)

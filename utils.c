@@ -61,7 +61,7 @@ void create_dense_matrix_1D(int N, int K, double **X)
  * @param value: Iteration space dimension
  * @param nthread: number of processors available to the device.
  *
- * Returns the value chunk size computed
+ * @returns the value chunk size computed
  */
 
 int compute_chunk_size(int value, int nthread)
@@ -84,8 +84,9 @@ int compute_chunk_size(int value, int nthread)
  * compute_GFLOPS - Computing the GLOPS
  * @param k: Number of columns of the dense matrix
  * @param nz: Number of nz
- * @param time: time in nano-secons
- * Returns the computed GLOPS value
+ * @param time: time in nano-secons.
+ * 
+ * @returns the computed GLOPS value
  */
 double compute_GFLOPS(int k, int nz, double time)
 {
@@ -286,7 +287,7 @@ int *convert_2D_to_1D_per_ragged_matrix(int M, int nz, int *nz_per_row, int **A)
  * @param M: Number of rows
  * @param nz_per_row: Array of number of non-zero per row
  *
- * Returns an array that represents the number of non-zeroes up to the i-th row
+ * @returns an array that represents the number of non-zeroes up to the i-th row
  */
 
 int *compute_sum_nz(int M, int *nz_per_row)
@@ -401,7 +402,7 @@ void get_time(struct timespec *time)
  *@param mean: Current value for mean 
  *@param n:  It is a counter that tracks the number of items in the sequence
  *
- * Returns the newest computed mean
+ * @returns the newest computed mean
  */
 double calculate_mean(double x, double mean, int n)
 {
@@ -418,7 +419,7 @@ double calculate_mean(double x, double mean, int n)
  *@param M2 : sum of squared differences 
  *@param n: It is a counter that tracks the number of items in the sequence
 
- * Returns the newest computed sum of squared differences 
+ * @returns the newest computed sum of squared differences 
  */
 
 double calculate_M2(double x, double mean, double M2, int n)

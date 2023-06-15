@@ -300,10 +300,10 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     /* Column of the item that the warp should compute */
     const int z = warp_id % K;
 
-    vals[threadIdx.x] = 0.0;
 
     if (warp_id < num_elements)
-    {
+    {   
+
         int start = d_irp[i];
         int end = 0;
 
@@ -378,9 +378,11 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
 
     extern __shared__ volatile double LDS[];
 
-    const int startRow = d_rowBlocks[blockIdx.x / K];
+    const int my_block = blockIdx.x / K;
 
-    const int nextStartRow = d_rowBlocks[(blockIdx.x / K) + 1];
+    const int startRow = d_rowBlocks[my_block];
+
+    const int nextStartRow = d_rowBlocks[my_block + 1];
 
     const int num_rows = nextStartRow - startRow;
 
@@ -483,7 +485,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
  * @param rowBlocks: Array containing the starting row index per block
  * @param threadsPerBlock: pointer to an integer representing the computed threads per block
  *
- * Returns the number of blocks computed
+ * @returns the number of blocks computed
  *
  * */
 
@@ -578,7 +580,7 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
  *@param X: Dense matrix
  *@param time: Pointer to a double representing the time elapsed for the GPU product
  *
- * Returns the resulting/product matrix computed by the GPU kernel
+ * @returns the resulting/product matrix computed by the GPU kernel
  */
 
 double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp, double **X)

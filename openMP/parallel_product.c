@@ -21,7 +21,7 @@
  * @param X: Matrix X
  * @param time: Pointer of a double representing the time
  * @param nthread: Number of processors available to the device.
- * Returns resulting matrix y of dimension (M * K)
+ * @returns resulting matrix y of dimension (M * K)
  */
 
 double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, int *irp, double **X, double *time, int nthread)
@@ -132,7 +132,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
  * @param time: Pointer of a double representing the time
  * @param nthread: Number of processors available to the device.
  *
- * Returns resulting matrix y of dimension (M * K)
+ * @returns resulting matrix y of dimension (M * K)
  */
 
 double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row, double **as, int **ja, double **X, double *time, int nthread)
@@ -246,7 +246,7 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
  * @param time: Pointer of a double representing the time
  * @param nthread: Number of processors available to the device.
  *
- * Returns resulting matrix y of dimension (M * K)
+ * @returns resulting matrix y of dimension (M * K)
  */
 
 double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int *nz_per_row, double **as, int **ja, double **X, double *time, int nthread)

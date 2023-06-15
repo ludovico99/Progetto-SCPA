@@ -15,7 +15,7 @@
  * @param J: Array of integers that contains the column indexes for each number not zero
  * @param val: Array of double containing the values for each number not zero
  *
- * Returns 0 if the 2 conversions produced are equal, otherwise returns zero
+ * @returns 0 if the 2 conversions produced are equal, otherwise returns zero
  */
 
 int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, double *val, int nthread)
@@ -115,7 +115,7 @@ int compare_conversion_algorithms_ellpack(int M, int N, int nz, int *I, int *J, 
  * @param J: Array of integers that contains the column indexes for each number not zero
  * @param val: Array of double containing the values for each number not zero
  *
- * Returns 0 if the 2 conversions produced are equal, otherwise returns zero
+ * @returns 0 if the 2 conversions produced are equal, otherwise returns zero
  */
 
 int compare_conversion_algorithms_csr(int M, int N, int nz, int *I, int *J, double *val, int nthread)

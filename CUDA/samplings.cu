@@ -77,6 +77,8 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     int number_of_blocks;
     /* Number of warps per block*/
     int warpsPerBlock;
+     /* Number of sub-warps per block*/
+    int subWarpsPerBlock;
 
     // /* sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
     // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
@@ -127,14 +129,14 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
         create_dense_matrix_1D(N, K[k], &h_X);
 
         /* Y array host memory allocation */
-        memory_allocation(double, M *K[k], h_y);
+        memory_allocation(double, M * K[k], h_y);
 
         /* Y array host memory allocation */
-        memory_allocation_Cuda(double, M *K[k], d_y);
+        memory_allocation_Cuda(double, M * K[k], d_y);
         /* Device allocation for dense matrix X */
-        memory_allocation_Cuda(double, N *K[k], d_X);
+        memory_allocation_Cuda(double, N * K[k], d_X);
 
-        memcpy_to_dev(h_X, d_X, double, N *K[k]);
+        memcpy_to_dev(h_X, d_X, double, N * K[k]);
 
          /* Number of elements of the product matrix Y */
         numElements = M * K[k];
@@ -177,8 +179,10 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
                 threadsPerBlock = MAX_BLOCK_DIM;
 
+                subWarpsPerBlock = threadsPerBlock / sub_warp_size
+
                 /* Number of blocks per grid */
-                blocksPerGrid = (numElements +  threadsPerBlock / sub_warp_size - 1) / (threadsPerBlock / sub_warp_size) ;
+                blocksPerGrid = (numElements +  subWarpsPerBlock - 1) / subWarpsPerBlock;
                 break;
             default:
                 printf("The mode is invalid\n");

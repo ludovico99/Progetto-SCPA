@@ -162,7 +162,6 @@ int *coo_to_CSR_parallel_optimization(int M, int N, int nz, int *I, int *J, doub
     memory_allocation(int, nz, *ja);
 
     memory_allocation(int, M, *irp);
-    memset(*irp, -1, sizeof(int) * M);
 
     chunk_size = compute_chunk_size(nz, nthread);
 

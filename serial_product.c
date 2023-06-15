@@ -23,7 +23,7 @@
  * @param X: Matrix X
  * @param time: Pointer of a double representing the time
  *
- * Returns resulting matrix y of dimension (M * K)
+ * @returns resulting matrix y of dimension (M * K)
  */
 
 double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, int *irp, double **X, double *time)
@@ -118,7 +118,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
  * @param X: Matrix X
  * @param time: Pointer of a double representing the time
  *
- * Returns resulting matrix y of dimension (M * K)
+ * @returns resulting matrix y of dimension (M * K)
  */
 
 double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row, double **as, int **ja, double **X, double *time)
@@ -211,7 +211,7 @@ double **serial_product_ellpack(int M, int N, int K, int nz, int max_nz_per_row,
  * @param X: Matrix X
  * @param time: Pointer of a double representing the time
  *
- * Returns resulting matrix y of dimension (M * K)
+ * @@returns resulting matrix y of dimension (M * K)
  */
 
 double **serial_product_ellpack_no_zero_padding(int M, int N, int K, int nz, int *nz_per_row, double **as, int **ja, double **X, double *time)

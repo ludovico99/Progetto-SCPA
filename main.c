@@ -52,7 +52,7 @@ static void create_matrix_coo(int mode, int *M, int *N, int *nz, int **I, int **
  *
  * @param matcode: Array that represents the type of the matrix
  *
- * Returns 1 if the matrix is not supported, otherwise returns 0
+ * @returns 1 if the matrix is not supported, otherwise returns 0
  */
 
 static int check_matcode_error(MM_typecode matcode)

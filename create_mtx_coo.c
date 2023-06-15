@@ -10,7 +10,7 @@
 /**
  * init_stream - Auxiliary function: Reopening the file and moving to the correct location
  *
- * Returns the FILE* of the file that has been opened
+ * @returns the FILE* of the file that has been opened
  */
 
 static FILE *init_stream(void)
