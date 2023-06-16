@@ -11,7 +11,7 @@
 #define WARP_SIZE 32
 
 #define memory_allocation_Cuda(tipo, dimensione, puntatore)                                              \
-    err = cudaMalloc((void **)&puntatore, dimensione * sizeof(tipo));                                    \
+    err = cudaMalloc((void **)&puntatore, (dimensione) * sizeof(tipo));                                    \
     if (err != cudaSuccess)                                                                              \
     {                                                                                                    \
         fprintf(stderr, "Failed to allocate device memory (error code %s)!\n", cudaGetErrorString(err)); \
@@ -19,7 +19,7 @@
     }
 
 #define memcpy_to_dev(source, destination, tipo, dimensione)                                                  \
-    err = cudaMemcpy(destination, source, dimensione * sizeof(tipo), cudaMemcpyHostToDevice);                 \
+    err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyHostToDevice);                 \
     if (err != cudaSuccess)                                                                                   \
     {                                                                                                         \
         fprintf(stderr, "Failed to copy as from host to device (error code %s)!\n", cudaGetErrorString(err)); \
@@ -27,7 +27,7 @@
     }
 
 #define memcpy_to_host(source, destination, tipo, dimensione)                                                 \
-    err = cudaMemcpy(destination, source, dimensione * sizeof(tipo), cudaMemcpyDeviceToHost);                 \
+    err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyDeviceToHost);                 \
     if (err != cudaSuccess)                                                                                   \
     {                                                                                                         \
         fprintf(stderr, "Failed to copy as from device to host (error code %s)!\n", cudaGetErrorString(err)); \

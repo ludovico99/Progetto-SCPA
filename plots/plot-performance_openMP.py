@@ -3,55 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 	
 import scipy.stats as stats
-
-def print_all_results(samplings_parallel,sampling_serial, k):
-
-	n = 30
-	x = samplings_parallel[0]
-	mean = samplings_parallel[1]
-	variance = samplings_parallel[2]
-	std = np.sqrt(variance)
-
-	serial_mean = sampling_serial[0]
-	serial_variance = sampling_serial[1]
-	std_serial = np.sqrt(serial_variance)
-
-	plt.style.use('seaborn-v0_8')
-	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='x')
-	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='y')
-	
-	fig, ax = plt.subplots()
-	fig.set_size_inches(16, 9)
-
-	ax.plot(x, mean,marker='o', markersize=2, label="Mean value with K fixed and variable num_thread", linewidth=0.5, color='indigo')
-
-	ci = stats.t.interval(0.995, n-1, loc = mean, scale=std/np.sqrt(n))
-
-	ax.fill_between(x, ci[0], ci[1],
-                    color='darkviolet', alpha=0.1,
-                    label="Confidence band of 95")
-
-
-	
-	ax.scatter(1, serial_mean, label="Mean value for serial product with K fixed", color='red')
-
-	ci = stats.t.interval(0.995, n-1, loc = serial_mean, scale=std_serial/np.sqrt(n))
-	ax.fill_between([1], ci[0], ci[1],
-                    color='red', alpha=0.1,
-                    label="Confidence band of 95")
-
-	ax.legend(loc='upper right', shadow=True, fontsize=10)
-
-	plt.title("Plot di (num_threads, media dei tempi) fissato K ={} ".format(k), fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
-
-	plt.xlabel("Numero Thread")
-	
-	plt.ylabel("Mean")
-	
-	plt.show()
-	
-	
-	
+import sys
 
 samplings_3_parallel = [[],[],[]]
 samplings_4_parallel  = [[],[],[]]
@@ -61,10 +13,84 @@ samplings_16_parallel  = [[],[],[]]
 samplings_32_parallel  = [[],[],[]]
 samplings_64_parallel  = [[],[],[]]
 
+samplings_parallel = [samplings_3_parallel, samplings_4_parallel, samplings_8_parallel, 
+samplings_12_parallel, samplings_16_parallel, samplings_32_parallel , samplings_64_parallel]
+
+samplings_3_serial = []
+samplings_4_serial  = []
+samplings_8_serial  = []
+samplings_12_serial  = []
+samplings_16_serial  = []
+samplings_32_serial  = []
+samplings_64_serial  = []
+
+samplings_serial = [samplings_3_serial, samplings_4_serial, samplings_8_serial, samplings_12_serial,samplings_16_serial, samplings_32_serial, samplings_64_serial]
+
+color_names = ['red', 'green', 'blue', 'orange', 'purple', 'yellow', 'cyan']
+
+n = 30  # number of samplings
+K = [3, 4, 8, 12, 16, 32, 64]
+
+
+def print_all_results():
+
+	plt.style.use('seaborn-v0_8')
+	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='x')
+	plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='y')
+	
+	fig, ax = plt.subplots()
+	fig.set_size_inches(16, 9)
+
+	for i in range (0, len(K)):
+
+		x = samplings_parallel[i][0]
+		mean = samplings_parallel[i][1]
+		variance = samplings_parallel[i][2]
+		std = np.sqrt(variance)
+
+		serial_mean = samplings_serial[i][0]
+		serial_variance = samplings_serial[i][1]
+		std_serial = np.sqrt(serial_variance)
+
+		ax.scatter(1, serial_mean, label="Mean value for serial product with K = {}".format(K[i]), color=color_names[i])
+
+		ci = stats.t.interval(0.995, n-1, loc = serial_mean, scale=std_serial/np.sqrt(n))
+		ax.fill_between([1], ci[0], ci[1],
+						color=color_names[i], alpha=0.1)
+
+		ax.plot(x, mean,marker='o', markersize=2, label="Mean value with K = {} and variable num_thread". format(K[i]), linewidth=0.5, color=color_names[i])
+
+		ci = stats.t.interval(0.995, n-1, loc = mean, scale=std/np.sqrt(n))
+
+		ax.fill_between(x, ci[0], ci[1],
+						color=color_names[i], alpha=0.1)
+
+
+
+	ax.legend(loc='upper right', shadow=True, fontsize=10)
+
+	plt.title("Plot di (num_threads, media dei tempi) per la matrice {} con banda di confidenza del 95 %".format(sys.argv[1]), fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
+
+	plt.xlabel("Numero Thread")
+	
+	plt.xticks(samplings_parallel[0][0])
+
+	plt.ylabel("Mean time in seconds")
+	
+	plt.show()
+	
+	
+	
+
 
 # Leggo le misure delle prestazioni per il parallelo
-#df_parallel = pandas.read_csv("samplings_parallel_ELLPACK.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
-df_parallel = pandas.read_csv("samplings_parallel_CSR.csv", dtype={'K': 'int64','num_thread': 'int64','mean': 'float64'})
+
+if len(sys.argv) >= 2:
+	#df_parallel = pandas.read_csv("samplings_ELLPACK_CPU_parallel_{}.csv".format(sys.argv[1]))
+	df_parallel = pandas.read_csv("samplings_CSR_CPU_parallel_{}.csv".format(sys.argv[1]))
+else:
+	print("usage: prog matrix\n")
+	exit(1)
 
 for row in df_parallel.itertuples(index= False):
 
@@ -104,16 +130,13 @@ for row in df_parallel.itertuples(index= False):
 		exit(1)
 
 # Leggo le misure delle prestazioni per il seriale
-#df_serial = pandas.read_csv("samplings_serial_ELLPACK.csv", dtype={'K': 'int64','mean': 'float64', 'variance': 'float64'})
-df_serial = pandas.read_csv("samplings_serial_CSR.csv", dtype={'K': 'int64','mean': 'float64'})
+if len(sys.argv) >= 2:
+	#df_serial = pandas.read_csv("samplings_ELLPACK_CPU_serial_{}.csv".format(sys.argv[1]))
+	df_serial = pandas.read_csv("samplings_CSR_CPU_serial_{}.csv".format(sys.argv[1]))
+else:
+    print("usage: prog matrix\n")
 
-samplings_3_serial = []
-samplings_4_serial  = []
-samplings_8_serial  = []
-samplings_12_serial  = []
-samplings_16_serial  = []
-samplings_32_serial  = []
-samplings_64_serial  = []
+
 
 for row in df_serial.itertuples(index= False):
 	try:	
@@ -146,13 +169,8 @@ for row in df_serial.itertuples(index= False):
 		exit(1)
 		
 
-print_all_results(samplings_3_parallel,samplings_3_serial, '3')
-print_all_results(samplings_4_parallel, samplings_4_serial, '4')
-print_all_results(samplings_8_parallel, samplings_8_serial, '8')
-print_all_results(samplings_12_parallel, samplings_12_serial, '12')
-print_all_results(samplings_16_parallel, samplings_16_serial, '16')
-print_all_results(samplings_32_parallel, samplings_32_serial, '32')
-print_all_results(samplings_64_parallel, samplings_64_serial, '64')
+print_all_results()
+
 
 print("I dati sono stati letti con successo.")
 

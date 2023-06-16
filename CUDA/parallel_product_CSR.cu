@@ -51,7 +51,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
         }
         else
         {
-            for (int j = d_irp[i]; (i < (M - 1) && j < d_irp[i + 1]) || (i >= M - 1 && j < nz); j++)
+            for (int j = d_irp[i]; j < d_irp[i + 1]; j++)
             {
                 if (d_as != NULL)
                     d_y[i * K + z] += d_as[j] * d_X[d_ja[j] * K + z];
@@ -107,7 +107,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
         else
         {
 
-            for (int j = d_irp[i]; (i < (M - 1) && j < d_irp[i + 1]) || (i >= M - 1 && j < nz); j++)
+            for (int j = d_irp[i]; j < d_irp[i + 1]; j++)
             {
                 if (d_as != NULL)
                     partial_sum += d_as[j] * d_X[d_ja[j] * K + z];
@@ -156,13 +156,9 @@ __global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_
 
     if (tid < num_elements)
     {
-        int start = d_irp[i];
-        int end = 0;
+        int start = d_irp[i]; //Starting index for the i-th row
+        int end =  d_irp[i + 1]; // Ending index for the i-th row
 
-        if (i < M - 1)
-            end = d_irp[i + 1]; // Ending index for the i-th row
-        else
-            end = nz;
 
         for (int j = start; j < end; j++)
         {
@@ -221,13 +217,8 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
 
     if (sub_warp_id < num_elements)
     {
-        int start = d_irp[i];
-        int end = 0;
-
-        if (i < M - 1)
-            end = d_irp[i + 1]; // Ending index for the i-th row
-        else
-            end = nz;
+        int start = d_irp[i]; // Starting index for the i-th row
+        int end = d_irp[i + 1];// Ending index for the i-th row
 
         double sum = 0.0;
         for (int j = start + lane; j < end; j += sub_warp_size)
@@ -305,12 +296,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
     {   
 
         int start = d_irp[i];
-        int end = 0;
-
-        if (i < M - 1)
-            end = d_irp[i + 1];
-        else
-            end = nz;
+        int end = d_irp[i + 1];;
 
         double sum = 0.0;
         for (int j = start + lane; j < end; j += WARP_SIZE)
@@ -324,7 +310,6 @@ __global__ void CSR_Vector_Kernel(const int M, const int K, const int nz, double
 
         vals[threadIdx.x] = sum;
 
-        // __syncthreads();
         /**
          * Parallel reduction in shared memory
          */
@@ -390,7 +375,6 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
 
     const int z = blockIdx.x % K;
 
-    LDS[tid_within_block] = 0.0;
 
     if (nextStartRow <= M)
     {   
@@ -400,10 +384,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
         {
             int nnz = 0;
 
-            if (nextStartRow < M)
-                nnz = d_irp[nextStartRow] - d_irp[startRow];
-            else
-                nnz = nz - d_irp[startRow];
+            nnz = d_irp[nextStartRow] - d_irp[startRow];
 
             int first_col = d_irp[startRow];
 
@@ -419,12 +400,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
             {
 
                 int start = d_irp[i];
-                int end = 0;
-
-                if (i < M - 1)
-                    end = d_irp[i + 1];
-                else
-                    end = nz;
+                int end = d_irp[i + 1];
 
                 double temp = 0.0;
                 for (int j = (start - first_col); j < (end - first_col); j++)
@@ -440,11 +416,7 @@ __global__ void CSR_Adaptive_Kernel(const int M, const int K, const int nz, doub
         {
             int rowStart = d_irp[startRow];
 
-            int rowEnd = 0;
-            if (nextStartRow < M)
-                rowEnd = d_irp[nextStartRow];
-            else
-                rowEnd = nz;
+            int rowEnd = d_irp[nextStartRow];
 
             double sum = 0.0;
 
@@ -515,8 +487,7 @@ int csr_adaptive_rowblocks(int M, int nz, int *irp, int **rowBlocks, int *thread
 
     for (int i = 1; i <= M; i++)
     {   
-        if (i == M)  sum_nz += nz - irp[i - 1];
-        else sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in the i-th row
+        sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in the i-th row
 
         if (sum_nz == local_size)
         { // The row fills up to LOCAL SIZE
@@ -626,7 +597,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(int, nz, d_ja);
     /* Device allocation for the irp vector containing the pointer to the vector entry ja */
-    memory_allocation_Cuda(int, M, d_irp);
+    memory_allocation_Cuda(int, M + 1, d_irp);
 
     printf("Copy input data from the host memory to the CUDA device\n");
 
@@ -636,10 +607,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     /* Copy of the contents of the vector ja from the Host to the Device */
     memcpy_to_dev(h_ja, d_ja, int, nz);
-    /* Copy of the contents of the vector irp from the Host to the Devicee */
-    memcpy_to_dev(h_irp, d_irp, int, M);
+    /* Copy of the contents of the vector irp from the Host to the Device */
+    memcpy_to_dev(h_irp, d_irp, int, M + 1);
     /* Copy of the dense vector X from the Host to the Device*/
-    memcpy_to_dev(h_X, d_X, double, N *K);
+    memcpy_to_dev(h_X, d_X, double, N * K);
 
     /* Number of threads per block */
     int threadsPerBlock = MAX_BLOCK_DIM;
@@ -654,8 +625,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     // }
     // printf("\n");
     // for (int i = 0; i < number_of_blocks - 1; i++){
-    //     if (rowBlocks[i + 1] == M) printf("%d\n", nz - h_irp[rowBlocks[i]]);
-    //     else printf("%d\n", h_irp[rowBlocks[i + 1]] - h_irp[rowBlocks[i]]);
+    //printf("%d\n", h_irp[rowBlocks[i + 1]] - h_irp[rowBlocks[i]]);
     // }
 
     // /* Device allocation for d_rowBlocks */
@@ -732,7 +702,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
     /* Versione accesso alla memoria globale ottimizzato */
-    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y,);
+    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
 #endif // CSR_ADAPTIVE
 

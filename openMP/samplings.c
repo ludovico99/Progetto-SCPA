@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "../include/header.h"
 
@@ -49,31 +50,36 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
     /**
      * Name of the file to be created and written to
     */
-    char *fn; 
+    char fn[100]; 
 
     double **X = NULL;
     double **y = NULL;
+
     double time = 0.0;
     double mean = 0.0;
     double M2 = 0.0;
     double variance = 0.0;
     double Gflops = 0.0;
+    double curr_Gflops = 0.0;
 
     int K[] = {3, 4, 8, 12, 16, 32, 64};
 
     int curr_samp = 0;
 
+    char *token;
+    token = strtok(filename,"/");
+    token = strtok(NULL, "/");
+
 // SAMPLING FOR THE SERIAL PRODUCT
 #ifdef SAMPLING_SERIAL
 #ifdef ELLPACK
 
-    fn = "plots/samplings_serial_ELLPACK.csv";
+    fflush(stdout);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,mean,variance\n");
 
 #elif CSR
-
-    fn = "plots/samplings_serial_CSR.csv";
+    sprintf (fn, "plots/samplings_CSR_CPU_serial_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,mean,variance\n");
 
@@ -83,11 +89,15 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
 // SAMPLING FOR THE PARALLEL PRODUCT
 #ifdef SAMPLING_PARALLEL
 #ifdef ELLPACK
-    fn = "plots/samplings_parallel_ELLPACK.csv";
+
+    sprintf (fn, "plots/samplings_ELLPACK_CPU_parallel_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,num_threads,mean,variance\n");
 #elif CSR
-    fn = "plots/samplings_parallel_CSR.csv";
+   
+    sprintf (fn, "plots/samplings_CSR_CPU_parallel_%s.csv", token);
+    printf("fn %s\n", fn);
+    fflush(stdout);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,num_threads,mean,variance\n");
 #endif
@@ -111,6 +121,7 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
             M2 = 0.0;
             Gflops = 0.0;
             variance = 0.0;
+            curr_Gflops = 0.0;
 
             for (curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
             {
@@ -133,9 +144,12 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
                 * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
                 * It achieves this by updating the mean and variance incrementally as new values are encountered.
                 */
+
+                curr_Gflops = compute_GFLOPS(K[k], nz, time * 1e9);
                 mean = calculate_mean(time, mean, curr_samp + 1);
                 M2 = calculate_M2(time, mean, M2, curr_samp + 1);
-                Gflops = calculate_mean(compute_GFLOPS(K[k], nz, time * 1e9), Gflops, curr_samp + 1);
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
                 /**
                  * Freeing the resulting matrix y
                 */
@@ -143,7 +157,7 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
             }
 
             /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (curr_samp - 1);
+            variance = M2 / (SAMPLING_SIZE - 1);
             /**
              * Writing in the file the overall mean and variance
             */

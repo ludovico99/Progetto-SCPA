@@ -60,12 +60,7 @@ double **serial_product_CSR(int M, int N, int K, int nz, double *as, int *ja, in
     for (int i = 0; i < M; i++)
     {
         int start = irp[i]; // Starting index for the i-th row
-        int end = 0;
-
-        if (i < M - 1)
-            end = irp[i + 1]; // Ending index for the i-th row
-        else
-            end = nz;
+        int end = irp[i + 1]; // Ending index for the i-th row
 
         for (int z = 0; z < K; z++)
         {

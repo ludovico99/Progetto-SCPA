@@ -42,7 +42,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     /**
      * Name of the file to be created and written to
      */
-    const char *fn;
+    char *fn;
 
     // HOST
     double *h_y = NULL;
@@ -96,7 +96,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     /* Device allocation for the as vector containing non-zero elements */
     memory_allocation_Cuda(int, nz, d_ja);
     /* Device allocation for the irp vector containing the pointer to the vector entry ja */
-    memory_allocation_Cuda(int, M, d_irp);
+    memory_allocation_Cuda(int, M + 1, d_irp);
 
     printf("Copy input data from the host memory to the CUDA device\n");
 
@@ -107,13 +107,13 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     /* Copy of the contents of the vector ja from the Host to the Device */
     memcpy_to_dev(h_ja, d_ja, int, nz);
     /* Copy of the contents of the vector irp from the Host to the Devicee */
-    memcpy_to_dev(h_irp, d_irp, int, M);
+    memcpy_to_dev(h_irp, d_irp, int, M + 1);
     /* Copy of the dense vector X from the Host to the Device*/
 
     /**
      * Opening the output file
      */
-    fn = "plots/samplings_CSR_GPU.csv";
+    sprintf (fn, "plots/samplings_CSR_GPU_%s.csv", filename);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "Algorithm,K,GFLOPS,GFLOPS_variability\n");
 

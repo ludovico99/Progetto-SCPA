@@ -44,8 +44,7 @@ int* coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
 
     memory_allocation(int, nz, *ja);
 
-    memory_allocation(int, M, *irp);
-    memset(*irp, -1, sizeof(int) * M);
+    memory_allocation(int, M + 1, *irp);
 
     printf("Counting number of non-zero entries in each row...\n");
 
@@ -65,7 +64,7 @@ int* coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
      */
     (*irp)[0] = 0;
 
-    for (int i = 0; i < M - 1; i++)
+    for (int i = 0; i < M; i++)
     {
         (*irp)[i + 1] = (*irp)[i] + nz_per_row[i];
     }
@@ -89,7 +88,7 @@ int* coo_to_CSR_serial(int M, int N, int nz, int *I, int *J, double *val, double
     /**
      * Reset row pointers
      */
-    for (int i = M - 1; i > 0; i--)
+    for (int i = M; i > 0; i--)
     {
         (*irp)[i] = (*irp)[i - 1];
     }
