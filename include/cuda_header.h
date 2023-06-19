@@ -22,7 +22,7 @@
     err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyHostToDevice);                 \
     if (err != cudaSuccess)                                                                                   \
     {                                                                                                         \
-        fprintf(stderr, "Failed to copy as from host to device (error code %s)!\n", cudaGetErrorString(err)); \
+        fprintf(stderr, "Failed to copy data from host to device (error code %s)!\n", cudaGetErrorString(err)); \
         exit(1);                                                                                              \
     }
 
@@ -30,7 +30,7 @@
     err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyDeviceToHost);                 \
     if (err != cudaSuccess)                                                                                   \
     {                                                                                                         \
-        fprintf(stderr, "Failed to copy as from device to host (error code %s)!\n", cudaGetErrorString(err)); \
+        fprintf(stderr, "Failed to copy data from device to host (error code %s)!\n", cudaGetErrorString(err)); \
         exit(1);                                                                                              \
     }
 
@@ -63,8 +63,8 @@ extern __global__ void CSR_kernel_v1(const int, const int, const int, double *, 
 extern __global__ void CSR_kernel_v2(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_kernel_v3(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Vector_Sub_warp(const int, const int, const int, double *, int *, int *, double *, double *, const int);
-extern __global__ void CSR_Vector_Kernel(const int, const int, const int, double *, int *, int *, double *, double *);
-extern __global__ void CSR_Adaptive_Kernel(const int, const int, const int, double *, int *, int *, double *, double *, int *);
+extern __global__ void CSR_Vector_Kernel(const int, const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Adaptive_Kernel(const int, const int,  const int, const int, double *, int *, int *, double *, double *, int *);
 extern int csr_adaptive_rowblocks(int, int, int *, int **, int *);
 
 #endif

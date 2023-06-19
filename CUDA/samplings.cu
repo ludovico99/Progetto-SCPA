@@ -36,13 +36,13 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector,csr_vector_sub_warp, csr_adaptive};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive};
 
     FILE *f_samplings;
     /**
      * Name of the file to be created and written to
      */
-    char *fn;
+    char fn[100];
 
     // HOST
     double *h_y = NULL;
@@ -113,7 +113,13 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     /**
      * Opening the output file
      */
-    sprintf (fn, "plots/samplings_CSR_GPU_%s.csv", filename);
+    printf("Opening the output file\n");
+
+    char *token;
+    token = strtok(filename,"/");
+    token = strtok(NULL, "/");
+
+    sprintf (fn, "plots/samplings_CSR_GPU_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "Algorithm,K,GFLOPS,GFLOPS_variability\n");
 
@@ -123,16 +129,21 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     for (int k = 0; k < sizeof(K) / sizeof(int); k++)
     {
-          /**
-         * Creating the X matrix with its number of columns specified by K[k]
-        */
-        create_dense_matrix_1D(N, K[k], &h_X);
-
+       
         /* Y array host memory allocation */
         memory_allocation(double, M * K[k], h_y);
 
         /* Y array host memory allocation */
         memory_allocation_Cuda(double, M * K[k], d_y);
+        /* The output matrix is initialized with all zeroes */
+        cudaMemset(d_y, 0, M * K[k] * sizeof(double));
+
+        /**
+         * Creating the X matrix with its number of columns specified by K[k]
+        */
+
+        create_dense_matrix_1D(N, K[k], &h_X);
+
         /* Device allocation for dense matrix X */
         memory_allocation_Cuda(double, N * K[k], d_X);
 
@@ -179,7 +190,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
                 threadsPerBlock = MAX_BLOCK_DIM;
 
-                subWarpsPerBlock = threadsPerBlock / sub_warp_size
+                subWarpsPerBlock = threadsPerBlock / sub_warp_size;
 
                 /* Number of blocks per grid */
                 blocksPerGrid = (numElements +  subWarpsPerBlock - 1) / subWarpsPerBlock;
@@ -210,11 +221,11 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 {
                 case csr_adaptive:
                     /* CSR Adaptive */
-                    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+                    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M,N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
                     break;
                 case csr_vector:
                     /* CSR Vector */
-                    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
                     break;
                 case csr_vector_sub_warp:
                     /* CSR Vector with sub-warps*/

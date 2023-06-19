@@ -213,9 +213,11 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     printf("Allocating device variables for CPU ELLPACK product ...\n");
     /* Y array host memory allocation */
-    memory_allocation_Cuda(double, M *K, d_y);
+    memory_allocation_Cuda(double, M * K, d_y);
+    /* The output matrix is initialized with all zeroes */
+    cudaMemset(d_y, 0, M * K * sizeof(double));
     /* Device allocation for dense matrix X */
-    memory_allocation_Cuda(double, N *K, d_X);
+    memory_allocation_Cuda(double, N * K, d_X);
     if (values != NULL)
         /* Device allocation for the 2D array ontaining non-zero elements */
         memory_allocation_Cuda(double, nz, d_values);

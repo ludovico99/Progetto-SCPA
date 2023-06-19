@@ -1,10 +1,10 @@
 import pandas
 import matplotlib.pyplot as plt
 import numpy as np
-
+import sys
 import scipy.stats as stats
 
-n = 3  # number of samplings
+n = 10  # number of samplings
 K = [1, 3, 4, 8, 12, 16, 32, 64]
 samplings_csr_scalar = [[], []]
 samplings_csr_vector = [[], []]
@@ -75,7 +75,7 @@ def print_all_results_CSR():
 
     ax.legend(loc='upper left', shadow=True, fontsize=10)
 
-    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO CSR)",
+    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO CSR) per la matrice {}".format(sys.argv[1]),
               fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
 
     plt.xticks(K)
@@ -120,7 +120,7 @@ def print_all_results_ELLPACK():
 
     ax.legend(loc='upper right', shadow=True, fontsize=10)
 
-    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO ELLPACK)",
+    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO ELLPACK) per la matrice {}".format(sys.argv[1]),
               fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
 
     plt.xlabel("Number of columns K")
@@ -133,8 +133,13 @@ def print_all_results_ELLPACK():
 
 
 # Leggo le misure delle prestazioni per il parallelo
-# df_parallel = pandas.read_csv("samplings_ELLPACK_GPU.csv")
-df_parallel = pandas.read_csv("samplings_CSR_GPU.csv")
+if len(sys.argv) >= 2:
+	#df_parallel = pandas.read_csv("samplings_ELLPACK_GPU_{}.csv".format(sys.argv[1]))
+	df_parallel = pandas.read_csv("samplings_CSR_GPU_{}.csv".format(sys.argv[1]))
+else:
+	print("usage: prog matrix\n")
+	exit(1)
+
 
 for row in df_parallel.itertuples(index=False):
 

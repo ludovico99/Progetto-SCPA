@@ -60,11 +60,13 @@ extern void coo_general(int, int *, int *, int *, int **, int **, double **);
 extern void coo_symm(int, int *, int *, int *, int **, int **, double **);
 extern void create_dense_matrix(int, int, double ***);
 extern void create_dense_matrix_1D(int, int, double **);
+extern void create_transpose_dense_matrix_1D(int, int, double **);
 extern void free_y(int, double **);
 extern void free_CSR_data_structures(double *, int *, int *);
 extern void print_y(int, int, double **);
 extern void print_y_GPU(int, int, double *);
-extern double *transpose(int, int, double **);
+extern double *transpose_from_2D(int, int, double **);
+extern double *transpose_from_1D(int, int, double *);
 extern void get_time(struct timespec *);
 
 #ifdef SAMPLINGS

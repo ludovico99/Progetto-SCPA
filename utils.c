@@ -55,6 +55,31 @@ void create_dense_matrix_1D(int N, int K, double **X)
     AUDIT printf("Completed dense matrix creation...\n");
 }
 
+/**
+ * create_transpose_dense_matrix_1D - Create a dense, transposed matrix (assuming the number of non-zeros is zero) of random values from 0.0 to 1.0
+ * @param N: Number of rows
+ * @param K: Number of columns
+ * @param nz: Number of nz
+ * @param X: Pointer to a 1D array of double 
+ */
+
+void create_transpose_dense_matrix_1D(int N, int K, double **X)
+{
+
+    AUDIT printf("Creating dense matrix ...\n");
+    memory_allocation(double, N * K, *X);
+    //srand (time(NULL));
+    for (int j = 0; j < N; j++)
+    {
+        for (int z = 0; z < K; z++)
+        {
+            (*X)[z * N + j] =  (double)rand()/RAND_MAX;
+        }
+    }
+
+    AUDIT printf("Completed dense matrix creation...\n");
+}
+
 
 /**
  * compute_chunk_size - Computation of the size of the chunk to be assigned to each thread
@@ -184,18 +209,18 @@ void free_y(int M, double **y)
 
 /**
  * convert_2D_to_1D - Function that converts a 2D in a 1D matrix
- * @param M: Number of rows
+ * @param N: Number of rows
  * @param K: Number of columns
  * @param A: Matrix to be converted
  */
 
-double *convert_2D_to_1D(int M, int K, double **A)
+double *convert_2D_to_1D(int N, int K, double **A)
 {
     double *ret = NULL;
-    all_zeroes_memory_allocation(double, M *K, ret);
+    all_zeroes_memory_allocation(double, N * K, ret);
 
     printf("Starting 2D conversion in 1D\n");
-    for (int i = 0; i < M; i++)
+    for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < K; j++)
         {
@@ -352,14 +377,41 @@ void print_y_GPU(int M, int K, double *y)
 }
 
 /**
- * transpose - Calculate the transpose of the input matrix
+ * transpose_from_2D - Calculate the transpose of the 2D input matrix
  * @param N: Number of rows
  * @param K: Number of non-zeroes
  * @param A: Matrix to be transposed
  *
  */
 
-double *transpose(int N, int K, double **A)
+double *transpose_from_2D(int N, int K, double **A)
+{
+    double *ret = NULL;
+
+    AUDIT printf("Computing transpose for X ...\n");
+
+    all_zeroes_memory_allocation(double, N * K, ret);
+
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < K; j++)
+        {
+            ret[j * N + i] = A[i][j];
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * transpose_from_1D - Calculate the transpose of the 1D input matrix
+ * @param N: Number of rows
+ * @param K: Number of non-zeroes
+ * @param A: Matrix to be transposed
+ *
+ */
+
+double *transpose_from_1D(int N, int K, double *A)
 {
     double *ret = NULL;
 
@@ -371,7 +423,7 @@ double *transpose(int N, int K, double **A)
     {
         for (int j = 0; j < K; j++)
         {
-            ret[j * N + i] = A[i][j];
+            ret[j * N + i] = A[i * K + j];
         }
     }
 

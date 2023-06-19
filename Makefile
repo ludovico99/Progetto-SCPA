@@ -158,6 +158,9 @@ Cube_Coup_dt0:
 ML_Laplace:
 	$(binDir)/app Matrici/ML_Laplace/ML_Laplace.mtx 
 
+thermal2:
+	$(binDir)/app Matrici/thermal2/thermal2.mtx 
+
 #------------------------------------------------------------------------- DEBUG SCRIPTS ---------------------------------------------------------------------------------------------------------
 
 max_nz_by_row:

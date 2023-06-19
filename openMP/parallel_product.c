@@ -49,7 +49,7 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
     /**
      * Computing of the transpose of X
      */
-    double *X_T = transpose(N, K, X);
+    double *X_T = transpose_from_2D(N, K, X);
 
     /**
      * Computing the size of the chunk to be assigned to each thread
@@ -160,7 +160,7 @@ double **parallel_product_ellpack(int M, int N, int K, int nz, int max_nz_per_ro
     /**
      * Computing of the transpose of X
      */
-    double *X_T = transpose(N, K, X);
+    double *X_T = transpose_from_2D(N, K, X);
 
     /**
      * Getting the elapsed time since—as described by POSIX—"some unspecified point in the past"
@@ -276,7 +276,7 @@ double **parallel_product_ellpack_no_zero_padding(int M, int N, int K, int nz, i
      * Computing of the transpose of X
      */
 
-    double *X_T = transpose(N, K, X);
+    double *X_T = transpose_from_2D(N, K, X);
 
     /**
      * Getting the elapsed time since—as described by POSIX—"some unspecified point in the past"
