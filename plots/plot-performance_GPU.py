@@ -8,6 +8,7 @@ n = 10  # number of samplings
 K = [1, 3, 4, 8, 12, 16, 32, 64]
 samplings_csr_scalar = [[], []]
 samplings_csr_vector = [[], []]
+samplings_csr_vector_by_row = [[], []]
 samplings_csr_vector_sw = [[], []]
 samplings_csr_adaptive = [[], []]
 
@@ -32,6 +33,10 @@ def print_all_results_CSR():
     variance_vector = samplings_csr_vector[1]
     std_vector = np.sqrt(variance_vector)
 
+    mean_vector_by_row = samplings_csr_vector_by_row[0]
+    variance_vector_by_row = samplings_csr_vector_by_row[1]
+    std_vector_by_row = np.sqrt(variance_vector_by_row)
+
     mean_vector_sw = samplings_csr_vector_sw[0]
     variance_vector_sw = samplings_csr_vector_sw[1]
     std_vector_sw = np.sqrt(variance_vector_sw)
@@ -55,6 +60,14 @@ def print_all_results_CSR():
     ax.fill_between(K, ci[0], ci[1],
                     color='red', alpha=0.1,
                     label="Confidence band of 95 for CSR VECTOR")
+
+    ax.plot(K, mean_vector_by_row, marker='o', markersize=2,
+            label="GLOPS for CSR VECTOR BY ROW", linewidth=0.5, color='orange')
+    ci = stats.t.interval(0.995, n-1, loc=mean_vector_by_row,
+                          scale=std_vector_by_row/np.sqrt(n))
+    ax.fill_between(K, ci[0], ci[1],
+                    color='orange', alpha=0.1,
+                    label="Confidence band of 95 for CSR VECTOR BY ROW")
 
     ax.plot(K, mean_vector_sw, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR SUB-WARP", linewidth=0.5, color='blue')
@@ -150,9 +163,13 @@ for row in df_parallel.itertuples(index=False):
         elif (row[0] == "csr_vector"):
             samplings_csr_vector[0].append(row[2])
             samplings_csr_vector[1].append(row[3])
+        elif (row[0] == "csr_vector_by_row"):
+            samplings_csr_vector_by_row[0].append(row[2])
+            samplings_csr_vector_by_row[1].append(row[3])
         elif (row[0] == "csr_adaptive"):
             samplings_csr_adaptive[0].append(row[2])
             samplings_csr_adaptive[1].append(row[3])
+        
         elif (row[0] == "csr_vector_sub_warp"):
             samplings_csr_vector_sw[0].append(row[2])
             samplings_csr_vector_sw[1].append(row[3])

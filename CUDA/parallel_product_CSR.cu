@@ -14,7 +14,7 @@
 /*------------------------------------------------------ CSR SCALAR --------------------------------------------------------------------------------------*/
 
 /**
- * CSR_kernel_v1 -  Product implementation between sparse matrix A and dense matrix X
+ * CSR_Scalar_v1 -  Product implementation between sparse matrix A and dense matrix X
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
@@ -31,7 +31,7 @@
  * optimized since we have global memory access every time we edit
  * the intermediate result.
  */
-__global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+__global__ void CSR_Scalar_v1(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     const long tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -64,7 +64,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
 }
 
 /**
- * CSR_kernel_v2 - Product implementation between sparse matrix A and dense matrix X
+ * CSR_Scalar_v2 - Product implementation between sparse matrix A and dense matrix X
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
@@ -82,7 +82,7 @@ __global__ void CSR_kernel_v1(const int M, const int K, const int nz, double *d_
  * optimized as we avoid continuously accessing global memory during
  * the calculation of the value of the element that the thread must compute.
  */
-__global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+__global__ void CSR_Scalar_v2(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     const long tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -122,7 +122,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
 }
 
 /**
- * CSR_kernel_v3 - Product implementation between sparse matrix A and dense matrix X
+ * CSR_Scalar_v3 - Product implementation between sparse matrix A and dense matrix X
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
@@ -139,7 +139,7 @@ __global__ void CSR_kernel_v2(const int M, const int K, const int nz, double *d_
  * via 'thread_id % K'. In this version of the product we want to optimize the number of accesses to d_irp
  * by storing its value in an automatic variable.
  */
-__global__ void CSR_kernel_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+__global__ void CSR_Scalar_v3(const int M, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     /* Thread identifier */
     const long tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -206,7 +206,8 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
     /* Global sub-warp Index */
     const long sub_warp_id = tid / sub_warp_size;
 
-    const int lane = tid % sub_warp_size; // thread index within the sub_warp
+    /* thread index within the sub_warp */
+    const int lane = tid % sub_warp_size;
 
     /* Row of the item that the warp should compute */
     const int i = sub_warp_id / K;
@@ -253,10 +254,99 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
     }
 }
 
+/*------------------------------------------------------ CSR Vector by row --------------------------------------------------------------------------------------*/
+
+/**
+ * CSR_Vector_by_row - CSR vector implementation between sparse matrix A and dense matrix X
+ * Each warp is responsible for calculating all components of a row
+ * Each sub-warp calculates an element in y for the row assigned to the warp of which the sub-warp is a part
+ * Throught shared memory some threads in a sub-warp perform parallel reduction.
+ * Only the first thread in the sub-warp writes the result in the resulting matrix
+ *
+ *@param M: Number of rows of the matrix A
+ *@param N: Number of columns of the matrix A, Number of rows of the matrix X
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param d_X: Dense matrix
+ *@param d_y: Resulting matrix
+ */
+
+__global__ void CSR_Vector_by_row(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+{
+    __shared__ volatile double vals[MAX_BLOCK_DIM];
+
+    /* Thread identifier */
+    const long tid = blockDim.x * blockIdx.x + threadIdx.x; // global thread index
+
+    const int tid_within_warp = threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
+
+    /* Global Warp Index */
+    const long warp_id = tid / WARP_SIZE;
+
+    /* Row of the item that the warp should compute */
+    const int i = warp_id;
+    /* Number of threads in a sub_warp*/
+    const int sub_warp_size = 4;
+    /*Gloabl sub-warp Index*/
+    const int sub_warp_id = tid_within_warp / sub_warp_size;
+    /* Thread index within a sub-warp*/
+    const int tid_within_sub_warp = tid % sub_warp_size;
+    /*Number of sub-warp in a warp*/
+    const int num_sub_warps = WARP_SIZE / sub_warp_size;
+
+    if (i < M)
+    {
+
+        int start = d_irp[i];
+        int end = d_irp[i + 1];
+
+        for (int z = sub_warp_id; z < K; z += num_sub_warps){
+
+            /*Starting column index in the 1D vector d_X*/
+            const long col = z * N;
+
+            double sum = 0.0;   
+            for (int j = start + tid_within_sub_warp; j < end; j += sub_warp_size )
+            {
+                
+                if (d_as != NULL)
+                    sum += d_as[j] * d_X[col + d_ja[j]];
+                else
+                    sum += 1.0 * d_X[col + d_ja[j]];
+                    
+            }
+            vals[threadIdx.x] = sum;
+
+            /**
+             * Parallel reduction in shared memory
+             */
+
+            for (int stride = sub_warp_size >> 1; stride > 0; stride >>= 1)
+            {
+                if (tid_within_sub_warp < stride)
+                    vals[threadIdx.x] += vals[threadIdx.x + stride];
+            }
+
+            /**
+             * Only the first thread writes the result
+             */
+
+            if (tid_within_sub_warp == 0)
+            {
+                d_y[i * K + z] = vals[threadIdx.x];
+            }
+        }
+    
+    }
+}
+
 /*------------------------------------------------------ CSR Vector --------------------------------------------------------------------------------------*/
 
 /**
- * CSR_Vector_Kernel - CSR vector implementation between sparse matrix A and dense matrix X
+ * CSR_Vector - CSR vector implementation between sparse matrix A and dense matrix X
  *
  * Each thread in a warp computes a partial result for an element in y.
  * Throught shared memory some threads in a warp perform parallel reduction.
@@ -273,7 +363,7 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
  *@param d_y: Resulting matrix
  */
 
-__global__ void CSR_Vector_Kernel(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+__global__ void CSR_Vector(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
 {
     __shared__ volatile double vals[MAX_BLOCK_DIM];
 
@@ -346,7 +436,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int N, const int K, const i
 /*------------------------------------------------------ CSR ADAPTIVE --------------------------------------------------------------------------------------*/
 
 /**
- * CSR_Adaptive_Kernel - CSR Adaptive implementation between sparse matrix A and dense matrix X
+ * CSR_Adaptive - CSR Adaptive implementation between sparse matrix A and dense matrix X
  *
  * CSR-Adapive is an algorithm that dynamically decides whether to use CSR-Stream or CSR-Vector
  *
@@ -362,7 +452,7 @@ __global__ void CSR_Vector_Kernel(const int M, const int N, const int K, const i
  *@param d_rowBlocks: Array containing the starting row index per block
  *
  */
-__global__ void CSR_Adaptive_Kernel(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int *d_rowBlocks)
+__global__ void CSR_Adaptive(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int *d_rowBlocks)
 {
 
     extern __shared__ volatile double LDS[];
@@ -665,6 +755,13 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of blocks per grid */
     int blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
 
+#elif CSR_VECTOR_BY_ROW
+
+    int warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original CSR_vector
+
+    /* Number of blocks per grid */
+    int blocksPerGrid = (M + warpsPerBlock - 1) / warpsPerBlock;
+
 #elif CSR_VECTOR_SUB_WARP
 
     /* Number of elements of the product matrix Y */
@@ -701,12 +798,16 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #ifdef CSR_ADAPTIVE
 
     /* CSR Adaptive */
-    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
 
 #elif CSR_VECTOR
 
     /* CSR Vector */
-    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+
+#elif CSR_VECTOR_BY_ROW
+
+    CSR_Vector_by_row<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
 #elif CSR_VECTOR_SUB_WARP
 
@@ -714,12 +815,12 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #else
 
     /* Versione accesso alla memoria globale non ottimizzato */
-    // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    // CSR_Scalar_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
-    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    // CSR_Scalar_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
     /* Versione accesso alla memoria globale ottimizzato */
-    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    CSR_Scalar_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
 #endif // CSR_ADAPTIVE
 

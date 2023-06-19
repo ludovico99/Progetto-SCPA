@@ -59,12 +59,13 @@ extern __global__ void ELLPACK_Sub_warp(const int , const int , int *, int *, do
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
 extern void samplings_GPU_CSR(int, int, int, double *, int *, int *);
 
-extern __global__ void CSR_kernel_v1(const int, const int, const int, double *, int *, int *, double *, double *);
-extern __global__ void CSR_kernel_v2(const int, const int, const int, double *, int *, int *, double *, double *);
-extern __global__ void CSR_kernel_v3(const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Scalar_v1(const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Scalar_v2(const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Scalar_v3(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Vector_Sub_warp(const int, const int, const int, double *, int *, int *, double *, double *, const int);
-extern __global__ void CSR_Vector_Kernel(const int, const int, const int, const int, double *, int *, int *, double *, double *);
-extern __global__ void CSR_Adaptive_Kernel(const int, const int,  const int, const int, double *, int *, int *, double *, double *, int *);
+extern __global__ void CSR_Vector(const int, const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Vector_by_row(const int, const int, const int, const int, double *, int *, int *, double *, double *);
+extern __global__ void CSR_Adaptive(const int, const int,  const int, const int, double *, int *, int *, double *, double *, int *);
 extern int csr_adaptive_rowblocks(int, int, int *, int **, int *);
 
 #endif

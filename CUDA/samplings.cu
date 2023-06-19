@@ -13,6 +13,7 @@
 #define csr_vector 1
 #define csr_vector_sub_warp 2
 #define csr_adaptive 3
+#define csr_vector_by_row 4
 
 
 /**
@@ -36,7 +37,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row};
 
     FILE *f_samplings;
     /**
@@ -177,6 +178,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 /* Number of blocks per grid */
                 blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
                 break;
+
             case csr_vector:
 
                 threadsPerBlock = MAX_BLOCK_DIM;
@@ -186,6 +188,17 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 /* Number of blocks per grid */
                 blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
                 break;
+
+            case csr_vector_by_row:
+
+                threadsPerBlock = MAX_BLOCK_DIM;
+
+                warpsPerBlock = threadsPerBlock / WARP_SIZE;
+
+                /* Number of blocks per grid */
+                blocksPerGrid = (M + warpsPerBlock - 1) / warpsPerBlock;
+                break;
+
             case csr_vector_sub_warp:
 
                 threadsPerBlock = MAX_BLOCK_DIM;
@@ -195,6 +208,8 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 /* Number of blocks per grid */
                 blocksPerGrid = (numElements +  subWarpsPerBlock - 1) / subWarpsPerBlock;
                 break;
+
+            
             default:
                 printf("The mode is invalid\n");
                 exit(1);
@@ -221,25 +236,33 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 {
                 case csr_adaptive:
                     /* CSR Adaptive */
-                    CSR_Adaptive_Kernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M,N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M,N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
                     break;
                 case csr_vector:
                     /* CSR Vector */
-                    CSR_Vector_Kernel<<<blocksPerGrid, threadsPerBlock>>>(M, N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
                     break;
+                case csr_vector_by_row:
+
+                    CSR_Vector_by_row<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+
+                    break;
+
                 case csr_vector_sub_warp:
                     /* CSR Vector with sub-warps*/
                     CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
                     break;
+
                 case csr_scalar:
 
                     /* Versione accesso alla memoria globale non ottimizzato */
-                    // CSR_kernel_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    // CSR_Scalar_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
 
-                    // CSR_kernel_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    // CSR_Scalar_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
 
                     /* Versione accesso alla memoria globale ottimizzato */
-                    CSR_kernel_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    CSR_Scalar_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+
                     break;
 
                 default:
@@ -288,6 +311,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 break;
             case csr_vector:
                 fprintf(f_samplings, "csr_vector,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
+            case csr_vector_by_row:
+                fprintf(f_samplings, "csr_vector_by_row,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
             case csr_vector_sub_warp:
                 fprintf(f_samplings, "csr_vector_sub_warp,%d, %lf,%.20lf\n", K[k], Gflops, variance);

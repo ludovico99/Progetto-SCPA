@@ -16,7 +16,7 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
 
 # to choose which implemented algorithms to use
-MODE = csr_vector
+MODE = csr_vector_by_row
 #to do some sampling of the computed stats
 SAMPLING = no
 
@@ -29,6 +29,8 @@ else ifeq ($(MODE), csr_adaptive)
     DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE
 else ifeq ($(MODE), csr_vector) 
 	DEFINES = -DCUDA -DCSR -DCSR_VECTOR
+else ifeq ($(MODE), csr_vector_by_row) 
+	DEFINES = -DCUDA -DCSR -DCSR_VECTOR_BY_ROW
 else ifeq ($(MODE), csr_vector_sub_warp) 
 	DEFINES = -DCUDA -DCSR -DCSR_VECTOR_SUB_WARP
 else ifeq ($(MODE), ellpack_sw) 
