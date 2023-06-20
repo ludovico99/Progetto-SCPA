@@ -677,9 +677,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     int *d_rowBlocks = NULL;
 #endif
 
-#ifdef CSR_VECTOR
-    h_X = transpose_from_2D(N, K, X);
-#elif CSR_ADAPTIVE
+#if defined(CSR_ADAPTIVE) || defined(CSR_VECTOR) || defined(CSR_VECTOR_BY_ROW)
     h_X = transpose_from_2D(N, K, X);
 #else
     /* 2D to 1D dense matrix X conversion*/
