@@ -11,6 +11,7 @@ samplings_csr_vector = [[], []]
 samplings_csr_vector_by_row = [[], []]
 samplings_csr_vector_sw = [[], []]
 samplings_csr_adaptive = [[], []]
+samplings_csr_adaptive_sb = [[], []]
 
 samplings_ellpack = [[], []]
 samplings_ellpack_sub_warp = [[], []]
@@ -45,29 +46,30 @@ def print_all_results_CSR():
     variance_adaptive = samplings_csr_adaptive[1]
     std_adaptive = np.sqrt(variance_adaptive)
 
+    mean_adaptive_sb = samplings_csr_adaptive_sb[0]
+    variance_adaptive_sb = samplings_csr_adaptive_sb[1]
+    std_adaptive_sb = np.sqrt(variance_adaptive_sb)
+
     ax.plot(K, mean_scalar, marker='o', markersize=2,
             label="GLOPS for CSR SCALAR", linewidth=0.5, color='indigo')
     ci = stats.t.interval(0.995, n-1, loc=mean_scalar,
                           scale=std_scalar/np.sqrt(n))
     ax.fill_between(K, ci[0], ci[1],
-                    color='indigo', alpha=0.1,
-                    label="Confidence band of 95 for CSR SCALAR")
+                    color='indigo', alpha=0.1)
 
     ax.plot(K, mean_vector, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR", linewidth=0.5, color='red')
     ci = stats.t.interval(0.995, n-1, loc=mean_vector,
                           scale=std_vector/np.sqrt(n))
     ax.fill_between(K, ci[0], ci[1],
-                    color='red', alpha=0.1,
-                    label="Confidence band of 95 for CSR VECTOR")
+                    color='red', alpha=0.1)
 
     ax.plot(K, mean_vector_by_row, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR BY ROW", linewidth=0.5, color='orange')
     ci = stats.t.interval(0.995, n-1, loc=mean_vector_by_row,
                           scale=std_vector_by_row/np.sqrt(n))
     ax.fill_between(K, ci[0], ci[1],
-                    color='orange', alpha=0.1,
-                    label="Confidence band of 95 for CSR VECTOR BY ROW")
+                    color='orange', alpha=0.1)
 
     ax.plot(K, mean_vector_sw, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR SUB-WARP", linewidth=0.5, color='blue')
@@ -75,20 +77,25 @@ def print_all_results_CSR():
                           scale=std_vector_sw/np.sqrt(n))
 
     ax.fill_between(K, ci[0], ci[1],
-                    color='blue', alpha=0.1,
-                    label="Confidence band of 95 for CSR VECTOR SUB-WARP")
+                    color='blue', alpha=0.1)
 
     ax.plot(K, mean_adaptive, marker='o', markersize=2,
             label="GLOPS for CSR ADAPTIVE", linewidth=0.5, color='green')
     ci = stats.t.interval(0.995, n-1, loc=mean_adaptive,
                           scale=std_adaptive/np.sqrt(n))
     ax.fill_between(K, ci[0], ci[1],
-                    color='green', alpha=0.1,
-                    label="Confidence band of 95 for CSR ADAPTIVE")
+                    color='green', alpha=0.1)
+
+    ax.plot(K, mean_adaptive_sb, marker='o', markersize=2,
+            label="GLOPS for CSR ADAPTIVE SUB BLOCKS", linewidth=0.5, color='cyan')
+    ci = stats.t.interval(0.995, n-1, loc=mean_adaptive_sb,
+                          scale=std_adaptive_sb/np.sqrt(n))
+    ax.fill_between(K, ci[0], ci[1],
+                    color='cyan', alpha=0.1)
 
     ax.legend(loc='upper left', shadow=True, fontsize=10)
 
-    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO CSR) per la matrice {}".format(sys.argv[1]),
+    plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo per il formato CSR".format(sys.argv[1]),
               fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
 
     plt.xticks(K)
@@ -169,7 +176,9 @@ for row in df_parallel.itertuples(index=False):
         elif (row[0] == "csr_adaptive"):
             samplings_csr_adaptive[0].append(row[2])
             samplings_csr_adaptive[1].append(row[3])
-        
+        elif (row[0] == "csr_adaptive_sub_block"):
+            samplings_csr_adaptive_sb[0].append(row[2])
+            samplings_csr_adaptive_sb[1].append(row[3])
         elif (row[0] == "csr_vector_sub_warp"):
             samplings_csr_vector_sw[0].append(row[2])
             samplings_csr_vector_sw[1].append(row[3])

@@ -10,28 +10,32 @@
 #define MAX_BLOCK_DIM 512
 #define WARP_SIZE 32
 
+#define adaptive 0
+#define adaptive_sub_blocks 1
+
+
 #define memory_allocation_Cuda(tipo, dimensione, puntatore)                                              \
-    err = cudaMalloc((void **)&puntatore, (dimensione) * sizeof(tipo));                                    \
+    err = cudaMalloc((void **)&puntatore, (dimensione) * sizeof(tipo));                                  \
     if (err != cudaSuccess)                                                                              \
     {                                                                                                    \
         fprintf(stderr, "Failed to allocate device memory (error code %s)!\n", cudaGetErrorString(err)); \
         exit(1);                                                                                         \
     }
 
-#define memcpy_to_dev(source, destination, tipo, dimensione)                                                  \
+#define memcpy_to_dev(source, destination, tipo, dimensione)                                                    \
     err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyHostToDevice);                 \
-    if (err != cudaSuccess)                                                                                   \
-    {                                                                                                         \
+    if (err != cudaSuccess)                                                                                     \
+    {                                                                                                           \
         fprintf(stderr, "Failed to copy data from host to device (error code %s)!\n", cudaGetErrorString(err)); \
-        exit(1);                                                                                              \
+        exit(1);                                                                                                \
     }
 
-#define memcpy_to_host(source, destination, tipo, dimensione)                                                 \
+#define memcpy_to_host(source, destination, tipo, dimensione)                                                   \
     err = cudaMemcpy(destination, source, (dimensione) * sizeof(tipo), cudaMemcpyDeviceToHost);                 \
-    if (err != cudaSuccess)                                                                                   \
-    {                                                                                                         \
+    if (err != cudaSuccess)                                                                                     \
+    {                                                                                                           \
         fprintf(stderr, "Failed to copy data from device to host (error code %s)!\n", cudaGetErrorString(err)); \
-        exit(1);                                                                                              \
+        exit(1);                                                                                                \
     }
 
 #define free_memory_Cuda(puntatore)                                                                  \
@@ -53,7 +57,7 @@ extern double *ELLPACK_GPU(int, int, int, int, int *, double **, int **, double 
 extern void samplings_GPU_ELLPACK(int, int, int, int *, double **, int **);
 
 extern __global__ void ELLPACK_kernel(const int, const int, int *, int *, double *, int *, double *, double *);
-extern __global__ void ELLPACK_Sub_warp(const int , const int , int *, int *, double *, int *, double *, double *, const int);
+extern __global__ void ELLPACK_Sub_warp(const int, const int, int *, int *, double *, int *, double *, double *, const int);
 
 #elif CSR
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
@@ -65,8 +69,9 @@ extern __global__ void CSR_Scalar_v3(const int, const int, const int, double *, 
 extern __global__ void CSR_Vector_Sub_warp(const int, const int, const int, double *, int *, int *, double *, double *, const int);
 extern __global__ void CSR_Vector(const int, const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Vector_by_row(const int, const int, const int, const int, double *, int *, int *, double *, double *);
-extern __global__ void CSR_Adaptive(const int, const int,  const int, const int, double *, int *, int *, double *, double *, int *);
-extern int csr_adaptive_rowblocks(int, int, int *, int **, int *);
+extern __global__ void CSR_Adaptive(const int, const int, const int, const int, double *, int *, int *, double *, double *, int *);
+extern __global__ void CSR_Adaptive_sub_blocks(const int, const int, const int, const int, double *, int *, int *, double *, double *, int *);
+extern int csr_adaptive_rowblocks(int, int, int, int *, int **, int *, int);
 
 #endif
 #endif

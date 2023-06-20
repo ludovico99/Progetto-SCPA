@@ -16,7 +16,7 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
 
 # to choose which implemented algorithms to use
-MODE = csr_vector_by_row
+MODE = csr_adaptive_sub_block
 #to do some sampling of the computed stats
 SAMPLING = no
 
@@ -27,6 +27,8 @@ ifeq ($(MODE), csr)
     DEFINES = -DCUDA -DCSR
 else ifeq ($(MODE), csr_adaptive) 
     DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE
+else ifeq ($(MODE), csr_adaptive_sub_block) 
+	DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE_SUB_BLOCK
 else ifeq ($(MODE), csr_vector) 
 	DEFINES = -DCUDA -DCSR -DCSR_VECTOR
 else ifeq ($(MODE), csr_vector_by_row) 
@@ -126,9 +128,6 @@ openmp-ellpack-parallel-samplings:
 	gcc -O3 -fopenmp -std=c99 -DOPENMP -D_POSIX_SOURCE -DELLPACK -DSAMPLINGS -DSAMPLING_PARALLEL -D_GNU_SOURCE $(SOURCES) openMP/samplings.c -o $(binDir)/app
 
 #------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
-
-matrice_prova:
-	$(binDir)/app Matrici/prova.mtx 
 
 adder-dcop-32:
 	$(binDir)/app Matrici/adder_dcop_32/adder_dcop_32.mtx 

@@ -14,13 +14,13 @@
 #define csr_vector_sub_warp 2
 #define csr_adaptive 3
 #define csr_vector_by_row 4
-
+#define csr_adaptive_sub_block 5
 
 /**
  *
  * samplings_GPU_CSR - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
  * The overall results are written in a proper .csv file.
- * 
+ *
  * @param M: Number of rows
  * @param N: Number of columns
  * @param nz: Number of nz
@@ -37,7 +37,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_sub_block};
 
     FILE *f_samplings;
     /**
@@ -78,7 +78,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     int number_of_blocks;
     /* Number of warps per block*/
     int warpsPerBlock;
-     /* Number of sub-warps per block*/
+    /* Number of sub-warps per block*/
     int subWarpsPerBlock;
 
     // /* sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
@@ -86,7 +86,6 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 
     int sub_warp_size = 2;
-
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
@@ -117,10 +116,10 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     printf("Opening the output file\n");
 
     char *token;
-    token = strtok(filename,"/");
+    token = strtok(filename, "/");
     token = strtok(NULL, "/");
 
-    sprintf (fn, "plots/samplings_CSR_GPU_%s.csv", token);
+    sprintf(fn, "plots/samplings_CSR_GPU_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "Algorithm,K,GFLOPS,GFLOPS_variability\n");
 
@@ -130,27 +129,27 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     for (int k = 0; k < sizeof(K) / sizeof(int); k++)
     {
-       
-        /* Y array host memory allocation */
-        memory_allocation(double, M * K[k], h_y);
 
         /* Y array host memory allocation */
-        memory_allocation_Cuda(double, M * K[k], d_y);
+        memory_allocation(double, M *K[k], h_y);
+
+        /* Y array host memory allocation */
+        memory_allocation_Cuda(double, M *K[k], d_y);
         /* The output matrix is initialized with all zeroes */
         cudaMemset(d_y, 0, M * K[k] * sizeof(double));
 
         /**
          * Creating the X matrix with its number of columns specified by K[k]
-        */
+         */
 
         create_dense_matrix_1D(N, K[k], &h_X);
 
         /* Device allocation for dense matrix X */
-        memory_allocation_Cuda(double, N * K[k], d_X);
+        memory_allocation_Cuda(double, N *K[k], d_X);
 
-        memcpy_to_dev(h_X, d_X, double, N * K[k]);
+        memcpy_to_dev(h_X, d_X, double, N *K[k]);
 
-         /* Number of elements of the product matrix Y */
+        /* Number of elements of the product matrix Y */
         numElements = M * K[k];
 
         for (int i = 0; i < sizeof(modes) / sizeof(int); i++)
@@ -160,7 +159,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             {
             case csr_adaptive:
 
-                number_of_blocks = csr_adaptive_rowblocks(M, nz, h_irp, &rowBlocks, &threadsPerBlock);
+                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive);
 
                 /* Device allocation for d_rowBlocks */
                 memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -171,6 +170,16 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 blocksPerGrid = (number_of_blocks - 1) * K[k];
                 break;
 
+            case csr_adaptive_sub_block:
+
+                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive_sub_blocks);
+                /* Device allocation for d_rowBlocks */
+                memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
+                /* Copy rowBlocks from the Host to the Device*/
+                memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
+                /* Number of blocks per grid */
+                blocksPerGrid = number_of_blocks - 1;
+                break;
             case csr_scalar:
 
                 threadsPerBlock = MAX_BLOCK_DIM;
@@ -206,19 +215,18 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 subWarpsPerBlock = threadsPerBlock / sub_warp_size;
 
                 /* Number of blocks per grid */
-                blocksPerGrid = (numElements +  subWarpsPerBlock - 1) / subWarpsPerBlock;
+                blocksPerGrid = (numElements + subWarpsPerBlock - 1) / subWarpsPerBlock;
                 break;
 
-            
             default:
                 printf("The mode is invalid\n");
                 exit(1);
                 break;
             }
 
-             /**
+            /**
              * Resetting the average stats
-            */
+             */
 
             M2 = 0.0;
             variance = 0.0;
@@ -228,7 +236,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             {
                 printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid,
                        threadsPerBlock);
-
+                fflush(stdout);
                 // START TIMER
                 checkCudaErrors(cudaEventRecord(start, stream));
 
@@ -236,11 +244,15 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 {
                 case csr_adaptive:
                     /* CSR Adaptive */
-                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M,N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+                    break;
+                case csr_adaptive_sub_block:
+                    /* CSR Adaptive */
+                    CSR_Adaptive_sub_blocks<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
                     break;
                 case csr_vector:
                     /* CSR Vector */
-                    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N,  K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
                     break;
                 case csr_vector_by_row:
 
@@ -285,9 +297,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
 
                 /**
-                * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
-                * It achieves this by updating the mean and variance incrementally as new values are encountered.
-                */
+                 * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
+                 * It achieves this by updating the mean and variance incrementally as new values are encountered.
+                 */
 
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
                 Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
@@ -298,14 +310,19 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
 
-             /**
+            /**
              * Writing in the file the GLOPS mean and variance
-            */
+             */
 
             switch (i)
             {
             case csr_adaptive:
                 fprintf(f_samplings, "csr_adaptive,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                free_memory_Cuda(d_rowBlocks);
+                free(rowBlocks);
+                break;
+            case csr_adaptive_sub_block:
+                fprintf(f_samplings, "csr_adaptive_sub_block,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 free_memory_Cuda(d_rowBlocks);
                 free(rowBlocks);
                 break;
@@ -345,7 +362,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     /**
      * Closing the file
-    */
+     */
 
     if (f_samplings != stdin)
         fclose(f_samplings);
@@ -357,13 +374,11 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 #define ellpack 0
 #define ellpack_sub_warp 1
 
-
-
 /**
  *
  * samplings_GPU_ELLPACK - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
  * The overall results are written in a proper .csv file.
- * 
+ *
  * @param M: Number of rows
  * @param N: Number of columns
  * @param nz: Number of nz
@@ -397,7 +412,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     int *h_col_indices = NULL;
     int *h_sum_nz = NULL;
 
-    //Device variables
+    // Device variables
     double *d_X = NULL;
     double *d_y = NULL;
     double *d_values = NULL;
@@ -424,7 +439,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     if (sub_warp_size > WARP_SIZE)
         sub_warp_size = WARP_SIZE;
 
-    /*Number of warps per block*/    
+    /*Number of warps per block*/
     int warpsPerBlock = threadsPerBlock / sub_warp_size;
 
     float expireTimeMsec = 0.0;
@@ -473,7 +488,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     {
         /**
          * Creating the X matrix with its number of columns specified by K[k]
-        */
+         */
         create_dense_matrix_1D(N, K[k], &h_X);
 
         /* Y array host memory allocation */
@@ -507,9 +522,9 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
                 break;
             }
 
-             /**
+            /**
              * Resetting the average stats
-            */
+             */
 
             curr_Gflops = 0.0;
             M2 = 0.0;
@@ -548,11 +563,11 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
                 checkCudaErrors(cudaEventRecord(stop, stream));
                 checkCudaErrors(cudaEventSynchronize(stop));
                 checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
-                
+
                 /**
-                * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
-                * It achieves this by updating the mean and variance incrementally as new values are encountered.
-                */
+                 * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
+                 * It achieves this by updating the mean and variance incrementally as new values are encountered.
+                 */
 
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
                 Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
@@ -563,9 +578,9 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
 
-             /**
+            /**
              * Writing in the file the GLOPS mean and variance
-            */
+             */
 
             switch (i)
             {
@@ -610,12 +625,11 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     if (h_sum_nz != NULL)
         free(h_sum_nz);
 
-     /**
+    /**
      * Closing the file
-    */
+     */
     if (f_samplings != stdin)
         fclose(f_samplings);
-
 }
 
 #endif
