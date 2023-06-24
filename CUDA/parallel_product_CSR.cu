@@ -293,14 +293,14 @@ __global__ void CSR_Vector_by_row(const int M, const int N, const int K, const i
     /* Number of threads in a sub_warp*/
     const int sub_warp_size = 4;
 
-    /* sub-warp Index*/
+    /* Sub-warp Index*/
     const int sub_warp_id = tid_within_warp / sub_warp_size;
 
     /* Thread index within a sub-warp*/
-    const int tid_within_sub_warp = tid % sub_warp_size;
+    const int tid_within_sub_warp = threadIdx.x % sub_warp_size;
 
     /*Number of sub-warp in a warp*/
-    const int num_sub_warps = WARP_SIZE / sub_warp_size;
+    const int num_sub_warps = WARP_SIZE / sub_warp_size; // It's 8
 
     if (i < M)
     {
