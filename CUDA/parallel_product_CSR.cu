@@ -206,7 +206,7 @@ __global__ void CSR_Vector_Sub_warp(const int M, const int K, const int nz, doub
     /* Global sub-warp Index */
     const long sub_warp_id = tid / sub_warp_size;
 
-    /* thread index within the sub_warp */
+    /* Thread index within the sub_warp */
     const int lane = tid % sub_warp_size;
 
     /* Row of the item that the warp should compute */
@@ -282,7 +282,7 @@ __global__ void CSR_Vector_by_row(const int M, const int N, const int K, const i
     const long tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     /* Thread index within the warp*/
-    const int tid_within_warp = threadIdx.x & (WARP_SIZE - 1);
+    const int tid_within_warp = threadIdx.x & (WARP_SIZE - 1); //It's a value between 0 to 31
 
     /* Global Warp Index */
     const long warp_id = tid / WARP_SIZE;
@@ -293,11 +293,11 @@ __global__ void CSR_Vector_by_row(const int M, const int N, const int K, const i
     /* Number of threads in a sub_warp*/
     const int sub_warp_size = 4;
 
-    /* Sub-warp Index*/
+    /* Sub-warp index in the warp*/
     const int sub_warp_id = tid_within_warp / sub_warp_size;
 
     /* Thread index within a sub-warp*/
-    const int tid_within_sub_warp = threadIdx.x % sub_warp_size;
+    const int tid_within_sub_warp = tid % sub_warp_size;
 
     /*Number of sub-warp in a warp*/
     const int num_sub_warps = WARP_SIZE / sub_warp_size; // It's 8
