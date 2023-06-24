@@ -3,6 +3,20 @@
 % PACKAGES
 \usepackage[utf8]{inputenc}
 \usepackage{hyperref}
+\usepackage{listings}
+\usepackage{bbding}
+
+%PREAMBOLO
+\lstdefinestyle{bashstyle}{
+  language=bash,
+  basicstyle=\ttfamily,
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=5pt,
+  frame=tb,
+  columns=fullflexible,
+  showstringspaces=false
+}
 
 % TITLE
 \title{Prodotto tra una matrice sparsa ed un multivettore}
@@ -122,20 +136,22 @@ Come suggerito dalla traccia del progetto, abbiamo provato ad implementare anche
     \item \textit{col = $blockIdx.x \% K$}
     \end{center}
 
-\textit{CSR-Adapive} è un algoritmo che decide dinamicamente se utilizzare \textit{CSR-Stream}, quando il numero di righe per blocco $>$ 1 o \textit{CSR-Vector}, quando il numero di righe per blocco di righe per blocco pari a 1. \\
+\textit{CSR-Adaptive} è un algoritmo che decide dinamicamente se utilizzare \textit{CSR-Stream}, quando il numero di righe per blocco $>$ 1 o \textit{CSR-Vector}, quando il numero di righe per blocco di righe per blocco pari a 1. \\
 \textit{CSR-Stream} si basa sulla seguente idea: ogni thread del blocco scrive in memoria condivisa la componente parziale, di sua competenza, del prodotto finale. Per esempio il thread i del blocco j calcola il prodotto tra $as[irp[row] + i] * X[(j \% K ) * N + ja[irp[row]+ i]$. Successivamente, un numero di threads pari al numero di righe per il blocco corrente eseguono la riduzione scalare dalla memoria condivisa per calcolare l'output finale. 
 \\ In questo kernel per sfruttare maggiormente i dati in cache, la matrice \textit{X} è stata trasposta in modo tale che gli elementi della colonna siano contigui in memoria.\\
 
-Anche in questo caso, non soddisfatti delle prestazioni ottenute abbiamo realizzato le seguenti versione ottimizzate per CSR-Vector e CSR-Adaptive:
+Anche in questo caso, non soddisfatti delle prestazioni ottenute abbiamo realizzato le seguenti versione ottimizzate per spMM di CSR-Vector e CSR-Adaptive:
   \begin{itemize}
    \item \textit{CSR\_Vector\_by\_row}: 
-    Ogni warp è responsabile del calcolo di tutti le componenti di una riga della matrice risultante ed è suddiviso in 8 sub-warp. I threads del sub-warp collaborano per calcolare un elemento in Y, la cui riga è determinata dal warp di cui il sub-warp fa parte. Attraverso la memoria condivisa alcuni thread in un sub-warp eseguono una riduzione parallela. Di conseguenza, abbiamo 8 sub-warp, ciascuno dei quali composto da 4 threads, del warp j responsabile della riga i che si suddividono le K colonne di X per calcolare la riga i di Y.    
-   \item \textit{CSR\_Adaptive\_sub\_blocks}: Ogni blocco di thread calcola tutte le componenti di una riga della matrice Y ed è suddiviso in un certo numero di sub-block. Ogni sub-block di sub\_block\_size threads è responsabile del calcolo di una prodotto della componente di sua competenza per la riga i nella matrice Y.  I threads dello stesso sub-block collaborano tra di loro per calcolare l'output finale.
+    Ogni warp, suddiviso in 8 sub-warp, è responsabile del calcolo di tutti le componenti di una riga della matrice risultante. Ogni blocco ha 512 thread, di conseguenza si hanno 16 warp per blocco che in parallelo calcolano 16 righe della matrice Y. Di conseguenza, il numero di blocchi per griglia è pari a $\frac{M}{16}$ con M numero di righe di A e 16 il numero di warp per blocco. I thread del sub-warp collaborano per calcolare un elemento in \textit{Y}, la cui riga è determinata dall' identificativo del warp di cui il sub-warp fa parte. Attraverso la memoria condivisa i thread della prima metà del sub-warp eseguono una riduzione parallela. In breve, abbiamo 8 sub-warp di 4 thread per ogni warp, che si suddividono le K colonne di \textit{X} per calcolare la riga i-esima di \textit{Y}.
+   
+   \item \textit{CSR\_Adaptive\_sub\_blocks}: Ogni blocco di thread, suddiviso in un certo numero di sub-block, calcola tutte le componenti di una riga della matrice Y. Ogni sub-block di sub\_block\_size thread è responsabile del calcolo di una prodotto della componente di sua competenza per la riga i nella matrice \textit{Y}. Di conseguenza, i thread dello stesso sub-block collaborano tra di loro per calcolare l'output finale.
    \end{itemize}
    
+In entrambi i casi la matrice X è stata trasposta in modo tale che gli elementi della colonna siano contigui in memoria. \\
+
 In questo modo abbiamo ridotto il numero di conflitti sulla gerarchia di cache per l'accesso alle colonne della matrice X. Di fatto, abbiamo meno threads che possono accedere in concorrenza alla stessa colonna della matrice X.
 
-In entrambi i casi la matrice X è stata trasposta in modo tale che gli elementi della colonna siano contigui in memoria.
 
 \section{Discussione implementazione ELLPACK}
 Passiamo alla discussione relativa al formato ELLPACK. Vedremo gli aspetti riguardanti la conversione della matrice dal formato \textit{COO} al formato \textit{ELLPACK} e gli aspetti che riguardano il prodotto SpMM sia con \textit{OpenMP} che con \textit{CUDA}.
@@ -150,7 +166,7 @@ Le strutture dati che vengono utilizzate per il formato \textit{ELLPACK} sono le
 
 Similmente a quanto descritto nella sezione relativa al formato \textit{CSR}, per rendere più efficiente la convesione della matrice dal formato \textit{COO} al formato \textit{ELLPACK} abbiamo implementato tre differenti versioni per l'algoritmo di conversione che si differenziano per il tempo di esecuzione.\\
 
-La prima versione dell'algoritmo di conversione è stata implementata nella funzione \textit{coo\_to\_ellpack\_parallel()}. In questa prima versione, viene utilizzato il \textit{padding 0x0} per il formato \textit{ELLPACK}. Come primo step viene calcolato il massimo numero degli elementi non-zero \textit{max\_so\_far} tra tutte le righe della matrice sparsa (vedi che sul codice non è cosi...strano). Dopo aver calcolato il massimo numero di non zeri per riga vengono allocate le strutture dati \textit{values} e \textit{col\_indices}. A questo punto, si passa con il popolare i due array bidimensionali con i valori che si trovano nelle strutture dati \textit{J} e \textit{val} del formato \textit{COO}. Più precisamente, fissata la riga \textit{i-esima} assegnata ad un thread \textit{T}, vengono identificati tutti quanti gli elementi non-zero appartenenti a quella riga e popolo le strutture dati \textit{values} e \textit{col\_indices} con rispettivamente il valore e l'indice di colonna dell'elemento non-zero.\\
+La prima versione dell'algoritmo di conversione è stata implementata nella funzione \textit{coo\_to\_ellpack\_parallel()}. In questa prima versione, viene utilizzato il \textit{padding 0x0} per il formato \textit{ELLPACK}. Come primo step viene calcolato il massimo numero degli elementi non-zero \textit{max\_so\_far} tra tutte le righe della matrice sparsa. Dopo aver calcolato il massimo numero di non zeri per riga vengono allocate le strutture dati \textit{values} e \textit{col\_indices}. A questo punto, si passa con il popolare i due array bidimensionali con i valori che si trovano nelle strutture dati \textit{J} e \textit{val} del formato \textit{COO}. Più precisamente, fissata la riga \textit{i-esima} assegnata ad un thread \textit{T}, vengono identificati tutti quanti gli elementi non-zero appartenenti a quella riga e popolo le strutture dati \textit{values} e \textit{col\_indices} con rispettivamente il valore e l'indice di colonna dell'elemento non-zero.\\
 
 Con la prima versione dell'algoritmo di conversione abbiamo riscontrato dei problemi di memoria (\textit{Out Of Memory}) durante l'esecuzione del programma sulle nostre macchine. Per poter eseguire il programma in locale abbiamo deciso di implementare un'altra versione dell'algoritmo di conversione. La seconda versione ha l'obiettivo di risparmiare memoria nella memorizzazione della matrice nel formato \textit{ELLPACK}. Più precisamente, abbiamo deciso di non utilizzare il \textit{padding 0x0} e di gestire le strutture dati \textit{values} e \textit{col\_indices} non necessariamente come tipici array bidimensionali. In questa versione, abbiamo calcolati il numero degli elemento non-zero all'interno di ciascuna riga della matrice popolando il vettore \textit{nz\_per\_row}.\\
 
@@ -191,9 +207,157 @@ Abbiamo 16 differenti \textit{sub-warp} di 2 thread ciascuno, ognuno con il comp
 
 \section{Misurazione delle prestazioni}
 
+
+
 \section{Suddivisione del lavoro}
+Il progetto è stato congiuntamente elaborato durante l'ultima sessione didattica. Di conseguenza, ci siamo incontrati giornalmente, dovendo seguire gli stessi corsi, per portare avanti il progetto e risolvere eventuali problematiche incontrate. Di fatto, non c'è una netta suddivisione del carico di lavoro.
 
 \section{Istruzioni per la compilazione}
+Per quanto riguarda la compilazione abbiamo reso disponibile nella root directory del progetto un Makefile. Il suo utilizzo può essere esemplificato nel seguente modo:
+\begin{itemize}
+    \item Compilazione openMP, a sua volta schematizzata nel seguente modo:
+    \begin{itemize}
+        \item \textbf{openmp-csr-compare-serial-parallel}: \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-csr-compare-serial-parallel 
+        \end{lstlisting} Con il precedente comando il codice viene compilato per eseguire sia il prodotto seriale che parallelo per il formato CSR, confrontare i tempi d'esecuzione e verificare la correttezza di quello parallelo attraverso un confronto elemento per elemento con quello seriale.
+        \item \textbf{openmp-ellpack-compare-serial-parallel}  \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-ellpack-compare-serial-parallel
+        \end{lstlisting} Con il precedente comando il codice viene compilato per ottenere un eseguibile che calcoli sia il prodotto seriale che parallelo per il formato ELLPACK, confrontare i tempi d'esecuzione e verificare la correttezza di quello parallelo attraverso un confronto elemento per elemento con quello seriale.
+        \item \textbf{openmp-csr-check-conversions}
+         \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-csr-check-conversions
+        \end{lstlisting} Con il precedente comando il codice viene compilato per confrontare la conversione originale e quella ottimizzata dal formato COO al formato CSR.
+        \item \textbf{openmp-ellpack-check-conversions}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-ellpack-check-conversions
+        \end{lstlisting} Con il precedente comando il codice viene compilato per confrontare la conversione originale e quella ottimizzata dal formato COO al formato ELLPACK.
+        \item \textbf{openmp-csr-serial-samplings}
+         \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-csr-serial-samplings
+        \end{lstlisting} Con il precedente comando il codice viene compilato per ottenere un eseguibile che esegua al variare di K e del numero di thread, per SAMPLING\_SIZE volte il prodotto seriale, calcoli la media e la varianza dei tempi d'esecuzione in modo incrementale ed in un singolo passo attraverso l'algoritmo di (one-pass) Welford
+        \item \textbf{openmp-ellpack-serial-samplings}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-ellpack-serial-samplings
+        \end{lstlisting} Con il precedente comando il codice viene compilato per ottenere un eseguibile che esegua al variare di K e del numero di thread, per SAMPLING\_SIZE volte il prodotto seriale per il formato ELLPACK, calcoli la media e la varianza dei tempi d'esecuzione in modo incrementale ed in un singolo passo attraverso l'algoritmo di (one-pass) Welford
+        \item \textbf{openmp-csr-parallel-samplings}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-csr-parallel-samplings
+        \end{lstlisting} Con il precedente comando il codice viene compilato per ottenere un eseguibile che esegua al variare di K e del numero di thread, per SAMPLING\_SIZE volte il prodotto parallelo per il formato CSR, calcoli la media e la varianza dei tempi d'esecuzione in modo incrementale ed in un singolo passo attraverso l'algoritmo di (one-pass) Welford
+        \item \textbf{openmp-ellpack-parallel-samplings}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make openmp-ellpack-parallel-samplings
+        \end{lstlisting} Con il precedente comando il codice viene compilato per ottenere un eseguibile che esegua al variare di K e del numero di thread, per SAMPLING\_SIZE volte il prodotto parallelo per il formato ELLPACK, calcoli la media e la varianza dei tempi d'esecuzione in modo incrementale ed in un singolo passo attraverso l'algoritmo di (one-pass) Welford
+    \end{itemize}
+    
+    \item Compilazione CUDA, a sua volta schematizzata nel seguente modo:
+    \begin{itemize}
+        \item \textbf{csr}
+         \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Scalar\_v3}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{csr\_adaptive}
+          \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr_adaptive
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Adaptive}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{csr\_adaptive\_sub\_block}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr_adaptive_sub_block
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Adaptive\_sub\_blocks}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{csr\_vector}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr_vector
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Vector}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{csr\_vector\_by\_row}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr_vector_by_row
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Vector\_by\_row}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{csr\_vector\_sub\_warp}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=csr_vector_sub_warp
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{CSR\_Vector\_Sub\_warp}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{ellpack\_sw}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=ellpack_sw
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{ELLPACK\_Sub\_warp}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item \textbf{ellpack}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all MODE=ellpack
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA \textit{ELLPACK\_kernel}, calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+    \end{itemize}
 
+    \begin{itemize}
+            \item[\Checkmark] \textbf{Senza campionamento}
+         \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all SAMPLING=no
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia il prodotto seriale, il kernel CUDA indicato nella variabile MODE (riga 19 nel Makefile), calcoli i GFLOPS e confronti il risultato del prodotto seriale con quello parallelo. 
+        \item[\Checkmark] \textbf{Con campionamento}
+        \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make all SAMPLING=yes
+        \end{lstlisting} Con il precedente comando si ottiene un eseguibile che lancia al variare di K, per SAMPLING\_SIZE volte, il kernel CUDA indicato nella variabile MODE (riga 19 nel Makefile), calcoli la media e la varianza GFLOPS in modo incrementale ed in un singolo passo attraverso l'algoritmo di (one-pass) Welford
+    \end{itemize}
+\end{itemize}
+
+Una volta generato l'eseguibile \textit{app} nella directory \textit/all è possibile utilizzare nuovamente il comando make nel seguente modo:
+ \begin{lstlisting}[style=bashstyle]
+        #!/bin/bash
+        make ML_Laplace 
+\end{lstlisting}. 
+        
+    In questo caso viene avviato il programma con in input la matrice ML\_Laplace.
+
+\section{Struttura del codice e sua riutilizzabilità}
+Il codice è organizzata nelle seguenti directory:
+\begin{itemize}
+    \item \textit{CUDA}: In questa directory sono presenti 3 files :
+    \begin{itemize}
+        \item \textit{parallel\_product\_CSR.cu}: Contiene la funzione di setup e il codice sorgente dei kernel per il formato CSR.
+        \item \textit{parallel\_product\_ELLPACK.cu}:
+        Contiene la funzione di setup e il codice sorgente dei kernel per il formato ELLPACK.
+        \item \textit{samplings.cu}:
+        Contiene le funzioni implementare per effettuare il sampling per il nucleo di calcolo realizzato in CUDA.
+    \end{itemize}
+    \item \textit{doc}: E' la directory che contiene la relazione e le immagini utilizzate per realizzarla.
+    \item \textit{include}: E' la directory che contiene gli headers.
+    \item \textit{lib}: E' la directory che contiene la libreria ausiliaria \textit{mmio.c} 
+    \item \textit{openMP}:
+     In questa directory sono presenti 3 files :
+    \begin{itemize}
+        \item \textit{parallel\_product.c}: Contiene i codici che implementano i prodotti paralleli in openMP per il formato ELLPACK e CSR.
+        \item \textit{samplings.c}:
+         Contiene le funzioni implementare per effettuare il sampling per il nucleo di calcolo realizzato in openMP.
+    \end{itemize}
+    \item \textit{plots}: E' la directory che contiene i file python realizzati per sviluppo dei grafici, i plot nel formato .png e i file CSV con il risultato del campionamento. 
+\end{itemize}
+
+Nella directory root, quella più "esterna" abbiamo i seguenti files:
+\begin{itemize}
+    \item \textit{checks.c}: Contiene le funzioni necessarie per effettuare i controlli sulla correttezza delle conversioni e del prodotto parallelo.
+    \item \textit{conversions\_parallel.c}: E' presente il codice sviluppato per realizzare le conversioni in modo parallelo dal formato COO al formato CSR ed ELLPACK.
+    \item \textit{conversions\_serial.c}
+    E' presente il codice sviluppato per realizzare le conversioni in modo seriale dal formato COO al formato CSR ed ELLPACK.
+    \item \textit{create\_mtx\_coo.c}: Sono presenti le funzioni che implementano la lettura del file .mtx e conseguente allocazione di memoria per memorizzare la matrice nel formato COO.
+    \item \textit{main.c}: E' il file che contiene il main, che si comporta come orchestratore del programma.
+    \item \textit{Makefile}: E' il Makefile descritto nella sezione precedente.
+    \item \textit{serial\_product.c}: Contiene le funzioni implementate per realizzare il prodotto seriale per il formato CSR ed ELLPACK.
+    \item \textit{utils.c}: Contiene le funzioni di utilità implementate. 
+\end{itemize}
 
 \end{document}
