@@ -69,15 +69,17 @@ def print_all_results():
 
 	ax.legend(loc='upper right', shadow=True, fontsize=10)
 
-	plt.title("Plot di (num_threads, media dei tempi) per la matrice {} con banda di confidenza del 95 %".format(sys.argv[1]), fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
+	plt.title("Matrice {}: Plot della media dei tempi in secondi al variare del numero di threads e K".format(sys.argv[1]), 
+	   fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
 
 	plt.xlabel("Numero Thread")
 	
 	plt.xticks(samplings_parallel[0][0])
 
 	plt.ylabel("Mean time in seconds")
-	
-	plt.show()
+
+	plt.savefig("Immagini/CSR_CPU_{}.png".format(sys.argv[1]))
+
 	
 	
 	

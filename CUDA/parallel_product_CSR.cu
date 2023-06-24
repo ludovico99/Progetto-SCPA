@@ -293,7 +293,7 @@ __global__ void CSR_Vector_by_row(const int M, const int N, const int K, const i
     /* Number of threads in a sub_warp*/
     const int sub_warp_size = 4;
 
-    /* ub-warp Index*/
+    /* sub-warp Index*/
     const int sub_warp_id = tid_within_warp / sub_warp_size;
 
     /* Thread index within a sub-warp*/
@@ -461,16 +461,21 @@ __global__ void CSR_Adaptive(const int M, const int N, const int K, const int nz
 
     extern __shared__ volatile double LDS[];
 
+    /*my_block identifies in d_rowBlocks the rows of its competence*/
     const int my_block = blockIdx.x / K;
 
+    /*Starting row index for the current block*/
     const int startRow = d_rowBlocks[my_block];
 
+    /*Index of the starting row of the next row for the current block*/
     const int nextStartRow = d_rowBlocks[my_block + 1];
-
+    
+    /* Number of rows in the current block*/
     const int num_rows = nextStartRow - startRow;
 
     const int tid_within_block = threadIdx.x;
 
+    /*Columns assigned to the current block*/
     const int z = blockIdx.x % K;
 
     if (nextStartRow <= M)
@@ -710,7 +715,7 @@ int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int 
         if (local_size < WARP_SIZE)
             local_size = WARP_SIZE;
         if (local_size > MAX_BLOCK_DIM)
-            local_size = MAX_BLOCK_DIM;
+            local_size = MAX_BLOCK_DIM; // Surely MAX_BLOCK_DIM * 8 bytes is less than sh_memory_per_block bytes
     }
 
     for (int i = 1; i <= M; i++)
@@ -859,10 +864,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     int number_of_blocks = csr_adaptive_rowblocks(M, K, nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive);
 
-    // /* Device allocation for d_rowBlocks */
+    /* Device allocation for d_rowBlocks */
     memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
 
-    // /* Copy rowBlocks from the Host to the Device*/
+    /* Copy rowBlocks from the Host to the Device*/
     memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
 
     /* Number of blocks per grid */
@@ -892,7 +897,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #elif CSR_VECTOR_BY_ROW
 
-    int warpsPerBlock = threadsPerBlock / WARP_SIZE; //<-- Per original CSR_vector
+    int warpsPerBlock = threadsPerBlock / WARP_SIZE;
 
     /* Number of blocks per grid */
     int blocksPerGrid = (M + warpsPerBlock - 1) / warpsPerBlock;

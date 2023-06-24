@@ -95,16 +95,18 @@ def print_all_results_CSR():
 
     ax.legend(loc='upper left', shadow=True, fontsize=10)
 
-    plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo per il formato CSR".format(sys.argv[1]),
+    plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo utilizzato per il formato CSR".format(sys.argv[1]),
               fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
 
     plt.xticks(K)
 
-    plt.xlabel("Number of columns K")
+    plt.xlabel("Number of columns (K)")
 
     plt.ylabel("GLOPS")
 
-    plt.show()
+    # Salva il grafico come immagine
+    plt.savefig("Immagini/CSR_GPU_{}.png".format(sys.argv[1]))
+
 
 
 def print_all_results_ELLPACK():
@@ -140,16 +142,17 @@ def print_all_results_ELLPACK():
 
     ax.legend(loc='upper right', shadow=True, fontsize=10)
 
-    plt.title("Plot dei GFLOPS al variare di K e dell'algoritmo (FORMATO ELLPACK) per la matrice {}".format(sys.argv[1]),
-              fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
+    plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo utilizzato per il formato ELLPACK".format(sys.argv[1]),
+              fontsize=18, fontname='DejaVu Sans', weight='bold', style='italic')
 
-    plt.xlabel("Number of columns K")
+    plt.xlabel("Number of columns (K)")
 
     plt.xticks(K)
 
     plt.ylabel("GLOPS")
+    # Salva il grafico come immagine
+    plt.savefig("Immagini/ELLPACK_GPU_{}.png".format(sys.argv[1]))
 
-    plt.show()
 
 
 # Leggo le misure delle prestazioni per il parallelo
