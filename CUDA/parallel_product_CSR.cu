@@ -907,6 +907,10 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
+    /**
+    * sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row
+    */
+
     // int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
     // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
 

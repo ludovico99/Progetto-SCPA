@@ -403,7 +403,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     /**
      * Name of the file to be created and written to
      */
-    const char *fn;
+    char fn[100];
 
     // host variables
     double *h_y = NULL;
@@ -435,9 +435,11 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     int numElements;
 
     /*sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
-    int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
-    if (sub_warp_size > WARP_SIZE)
-        sub_warp_size = WARP_SIZE;
+    // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
+    // if (sub_warp_size > WARP_SIZE)
+    //     sub_warp_size = WARP_SIZE;
+
+    int sub_warp_size = 2;
 
     /*Number of warps per block*/
     int warpsPerBlock = threadsPerBlock / sub_warp_size;
@@ -474,10 +476,16 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     /* Copy of the contents of h_sum_nz from the Host to the Device */
     memcpy_to_dev(h_sum_nz, d_sum_nz, int, M);
 
-    /**
+     /**
      * Opening the output file
      */
-    fn = "plots/samplings_ELLPACK_GPU.csv";
+    printf("Opening the output file\n");
+
+    char *token;
+    token = strtok(filename, "/");
+    token = strtok(NULL, "/");
+
+    sprintf(fn, "plots/samplings_ELLPACK_GPU_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "Algorithm,K,GFLOPS,GFLOPS_variability\n");
 

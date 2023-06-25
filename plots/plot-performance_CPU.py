@@ -78,7 +78,8 @@ def print_all_results():
 
 	plt.ylabel("Mean time in seconds")
 
-	plt.savefig("Immagini/CSR_CPU_{}.png".format(sys.argv[1]))
+	#plt.savefig("Immagini/CSR_CPU_{}.png".format(sys.argv[1]))
+	plt.savefig("Immagini/ELLPACK_CPU_{}.png".format(sys.argv[1]))
 
 	
 	
@@ -88,8 +89,8 @@ def print_all_results():
 # Leggo le misure delle prestazioni per il parallelo
 
 if len(sys.argv) >= 2:
-	#df_parallel = pandas.read_csv("samplings_ELLPACK_CPU_parallel_{}.csv".format(sys.argv[1]))
-	df_parallel = pandas.read_csv("samplings_CSR_CPU_parallel_{}.csv".format(sys.argv[1]))
+	df_parallel = pandas.read_csv("samplings_ELLPACK_CPU_parallel_{}.csv".format(sys.argv[1]))
+	#df_parallel = pandas.read_csv("samplings_CSR_CPU_parallel_{}.csv".format(sys.argv[1]))
 else:
 	print("usage: prog matrix\n")
 	exit(1)
@@ -133,8 +134,8 @@ for row in df_parallel.itertuples(index= False):
 
 # Leggo le misure delle prestazioni per il seriale
 if len(sys.argv) >= 2:
-	#df_serial = pandas.read_csv("samplings_ELLPACK_CPU_serial_{}.csv".format(sys.argv[1]))
-	df_serial = pandas.read_csv("samplings_CSR_CPU_serial_{}.csv".format(sys.argv[1]))
+	df_serial = pandas.read_csv("samplings_ELLPACK_CPU_serial_{}.csv".format(sys.argv[1]))
+	#df_serial = pandas.read_csv("samplings_CSR_CPU_serial_{}.csv".format(sys.argv[1]))
 else:
     print("usage: prog matrix\n")
 

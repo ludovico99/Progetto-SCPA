@@ -255,11 +255,8 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
     int blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 
 #else 
-    /**
-     * sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row
-    */
-    int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
-    if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
+  
+    int sub_warp_size = 2;
 
     /**
      * Each sub warp computes an element. 
