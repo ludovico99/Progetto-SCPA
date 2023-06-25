@@ -5,7 +5,8 @@
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{bbding}
-
+\usepackage{float}
+\usepackage{graphicx}
 %PREAMBOLO
 \lstdefinestyle{bashstyle}{
   language=bash,
@@ -206,8 +207,98 @@ Abbiamo 16 differenti \textit{sub-warp} di 2 thread ciascuno, ognuno con il comp
 \end{itemize}
 
 \section{Misurazione delle prestazioni}
+Nel presente capitolo, ci concentreremo sull'analisi delle prestazioni del prodotto matrice sparsa con multi-vettore su  CPU e GPU. Per una maggiore comprensione di tale argomento abbiamo realizzato dei grafici appositi.  Le misurazioni delle prestazioni sono state effettuate sul server di dipartimento, come da traccia.\\
 
+\subsection{Prestazioni su CPU}
+I grafici realizzati su CPU mostrano, data la matrice in input, l'andamento dei tempo medio in secondi al variare del numero di thread del device e di K, numero di colonne della matrice X. Ci aspettiamo, di conseguenza, un andamento crescente al crescere di K e una decremento al crescere del numero di thread. \\
+La banda di confidenza del 95\% è stata inserita nell'analisi delle prestazioni del prodotto matrice sparsa con multi-vettore su CPU e GPU per fornire un'indicazione della variabilità dei risultati delle misurazioni. Quando si eseguono misurazioni sperimentali, è comune osservare una certa variabilità nei risultati a causa di diversi fattori, come le condizioni di carico del sistema, l'architettura hardware specifica, la gestione delle risorse da parte del sistema operativo, ecc. La banda di confidenza rappresenta l'intervallo di valori entro il quale ci si può aspettare che ricadano i risultati delle misurazioni con un determinato livello di confidenza statistica. La sua inclusione nel contesto dell'analisi delle prestazioni aiuta a comprendere meglio l'incertezza associata ai risultati e a fornire una stima della robustezza delle misurazioni.\\
 
+\subsubsection{CPU e CSR}
+Il comportamento descritto in precedenza è evidente nella seguente immagine:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Immagini/CSR_CPU_ML_Laplace.png}
+\caption{Tempi medi per la matrice ML\_Laplace nel formato CSR}
+\end{figure}
+
+Come da aspettative, abbiamo un grafico che è rispetto appieno il comportamento atteso. La spiegazione è molto intuitiva: 
+\begin{itemize}
+    \item  L'utilizzo di un numero maggiore di thread può sfruttare il parallelismo disponibile nel sistema, consentendo una maggiore distribuzione del carico di lavoro tra le unità di elaborazione. Quando il numero di thread aumenta, le attività possono essere eseguite contemporaneamente su più unità di elaborazione, riducendo il tempo complessivo di esecuzione. Tuttavia, è importante notare che l'aumento del numero di thread può comportare anche un sovraccarico aggiuntivo dovuto alla sincronizzazione e alla gestione dei thread stessi.
+    \item L'aumento dei tempi medi al crescere del numero di colonne del multi-vettore (rappresentato da K) può essere attribuito a diversi fattori: 
+    \begin{itemize}
+        \item \textbf{Accesso alla memoria:} L'elaborazione di un multi-vettore richiede l'accesso a K elementi del vettore per ogni colonna della matrice. Quando K aumenta, aumenta anche la quantità di dati da leggere dalla memoria. Questo può comportare un maggior numero di cache misses, dove i dati richiesti non sono presenti nella cache e devono essere recuperati dalla memoria principale. L'accesso alla memoria principale è generalmente più lento rispetto alla cache, il che può influire negativamente sui tempi di esecuzione complessivi.
+        \item \textbf{Dimensione dei dati:}  L'aumento del numero di colonne del multi-vettore comporta un aumento della dimensione complessiva dei dati coinvolti nell'operazione. Questo può influire sulla gestione della memoria, specialmente se la quantità di dati supera la capacità della cache o della memoria disponibile. L'aumento della dimensione dei dati può comportare un maggior numero di operazioni di trasferimento dati tra la memoria principale e la cache, che possono rallentare l'esecuzione complessiva dell'algoritmo.
+    \end{itemize}
+\end{itemize} 
+
+Un andamento del tutto analogo (asintoticamente) si ha per la matrice adder\_dcop\_32, che rispetto al ML\_Laplace ha un numero medio di non zeri ($\frac{11.246}{1.813} \approx  6,202$ per adder\_dcop\_32  vs $\frac{27.689.972}{377.002} \approx  73,447$ per ML\_Laplace per riga notevolmente inferiore.  
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Immagini/CSR_CPU_adder_dcop_32.png}
+\caption{Tempi medi per la matrice adder\_dcop\_32 nel formato CSR}
+\end{figure}
+
+\subsubsection{CPU e ELLPACK}
+
+Per quanto riguarda il formato ELLPACK possiamo notare un comportamento analogo per entrambe le matrici precedenti.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Immagini/ELLPACK_CPU_ML_Laplace.png}
+\includegraphics[width=\textwidth]{Immagini/ELLPACK_CPU_adder_dcop_32.png}
+\caption{Tempi medi per la matrice ML\_Laplace e adder\_dcop\_32 nel formato ELLPACK}
+\end{figure}
+
+\subsection{Prestazioni su GPU}
+La complessità intrinseca delle GPU ha reso difficile individuare un "pattern" ricorrente nelle trame dei prodotti matrice sparsa con multi-vettore. La GPU è un'architettura altamente specializzata progettata per eseguire in modo efficiente operazioni parallele su grandi quantità di dati. A differenza delle CPU, le GPU sono caratterizzate da un elevato grado di parallelismo massivo (quindi maggiore variabilità) e da una gerarchia di memoria complessa.\\
+
+A causa di questa complessità, l'analisi delle prestazioni sulle GPU richiede un approccio dettagliato e specifico per l'architettura utilizzata. Le GPU moderne possono avere diverse generazioni, modelli e configurazioni, ognuna con le proprie caratteristiche uniche. Pertanto, è difficile identificare un pattern generale nei plots dei prodotti matrice sparsa con multi-vettore su GPU che sia applicabile a tutte le architetture.\\
+
+Per quanto riguarda la GPU, abbiamo realizzato dei grafici che mostrano l'andamento medio dei GFLOPS al variare del kernel utilizzato e di K. Anche in questo caso abbiamo rappresentato la banda di confidenza del 95\%.
+\\
+\subsubsection{GPU e CSR}
+Consideriamo per primo il formato CSR. Come detto in precedenza, per questo formato abbiamo realizzato diversi kernel. Per analizzarli conviene confrontare i risultati ottenuti per le matrici adder\_dcop\_32 e ML\_Laplace, essendo dimensionalmente e strutturalmente molto diverse.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Immagini/CSR_GPU_ML_Laplace.png}
+\includegraphics[width=\textwidth]{Immagini/CSR_GPU_adder_dcop_32.png}
+\caption{GFLOPS per la matrice ML\_Laplace e adder\_dcop\_32 nel formato CSR}
+\end{figure}
+
+Un fattore determinante per analizzare le immagini precedenti è il numero medio di non zeri:
+    \begin{itemize}
+        \item  Per ML\_Laplace è $\frac{27.689.972}{377.002} \approx  73,447$
+        \item Per adder\_dcop\_32 $\frac{11.246}{1.813} \approx 6,202$
+    \end{itemize} 
+    
+E' possibile fare le seguenti considerazioni algoritmo per algoritmo:
+(TODO)
+\begin{itemize}
+    \item \textbf{CSR\_SCALAR}
+    \item \textbf{CSR\_VECTOR}
+    \item \textbf{CSR\_VECTOR\_BY\_ROW}
+    \item \textbf{CSR\_VECTOR\_SUB\_WARP}
+    \item \textbf{CSR\_ADAPTIVE}
+    \item \textbf{CSR\_ADAPTIVE\_SUB\_BLOCK}
+\end{itemize}
+
+\subsubsection{GPU e ELLPACK}
+Per quanto riguarda il formato ELLPACK abbiamo la seguente situazione:
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{Immagini/ELLPACK_GPU_ML_Laplace.png}
+\includegraphics[width=\textwidth]{Immagini/ELLPACK_GPU_adder_dcop_32.png}
+\caption{GFLOPS per la matrice ML\_Laplace e adder\_dcop\_32 nel formato ELLPACK}
+\end{figure}
+
+E' possibile fare le seguenti considerazioni algoritmo per algoritmo:
+(TODO)
+\begin{itemize}
+    \item \textbf{ELLPACK\_SCALAR}
+    \item \textbf{ELLPACK\_SUB\_WARP}
+\end{itemize}
 
 \section{Suddivisione del lavoro}
 Il progetto è stato congiuntamente elaborato durante l'ultima sessione didattica. Di conseguenza, ci siamo incontrati giornalmente, dovendo seguire gli stessi corsi, per portare avanti il progetto e risolvere eventuali problematiche incontrate. Di fatto, non c'è una netta suddivisione del carico di lavoro.
