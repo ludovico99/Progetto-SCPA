@@ -96,7 +96,7 @@ def print_all_results_CSR():
     ax.legend(loc='upper left', shadow=True, fontsize=10)
 
     plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo utilizzato per il formato CSR".format(sys.argv[1]),
-              fontsize=20, fontname='DejaVu Sans', weight='bold', style='italic')
+              fontsize=18, fontname='DejaVu Sans', weight='bold', style='italic')
 
     plt.xticks(K)
 
