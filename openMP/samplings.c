@@ -74,7 +74,7 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
 #ifdef SAMPLING_SERIAL
 #ifdef ELLPACK
 
-    fflush(stdout);
+    sprintf (fn, "plots/samplings_ELLPACK_CPU_serial_%s.csv", token);
     f_samplings = fopen(fn, "w+");
     fprintf(f_samplings, "K,mean,variance\n");
 

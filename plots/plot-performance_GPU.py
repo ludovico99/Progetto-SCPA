@@ -106,7 +106,7 @@ def print_all_results_CSR():
 
     # Salva il grafico come immagine
     plt.savefig("Immagini/CSR_GPU_{}.png".format(sys.argv[1]))
-
+   
 
 
 def print_all_results_ELLPACK():
