@@ -16,7 +16,7 @@ FLAGS = -DSM_${CC} -arch=sm_${CC} -lineinfo -Xcompiler=-O3 -Xptxas=-v
 #-fmad=false -->>> TO DEBUG
 
 # to choose which implemented algorithms to use
-MODE = csr_adaptive_sub_block
+MODE = csr_vector
 #to do some sampling of the computed stats
 SAMPLING = no
 

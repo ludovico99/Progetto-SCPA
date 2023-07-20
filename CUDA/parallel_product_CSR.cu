@@ -437,6 +437,80 @@ __global__ void CSR_Vector(const int M, const int N, const int K, const int nz, 
     }
 }
 
+
+
+/*------------------------------------------------------ CSR Vector RIDUZIONE OTTIMIZZATA --------------------------------------------------------------------------------------*/
+
+/**
+ * CSR_Vector - CSR vector implementation between sparse matrix A and dense matrix X
+ *
+ * Each thread in a warp computes a partial result for an element in y.
+ * Throught shared memory some threads in a warp perform parallel reduction.
+ * Only the first thread in the warp writes the result in the resulting matrix
+ *
+ *@param M: Number of rows of the matrix A
+ *@param N: Number of columns of the matrix A, Number of rows of the matrix X
+ *@param K:  Number of columns of the matrix X
+ *@param nz: Number of nz
+ *@param d_as: Vector containing the non-zero elements of the sparse array
+ *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ *@param d_irp: Vector containing the column index of the first nonzero of rows
+ *@param d_X: Dense matrix
+ *@param d_y: Resulting matrix
+ */
+
+__global__ void CSR_Vector_optimazed_reduction(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
+{
+    const int num_elements = M * K;
+
+    /* Thread identifier */
+    const long tid = blockDim.x * blockIdx.x + threadIdx.x; // global thread index
+
+    const int lane = threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
+
+    /* Global Warp Index */
+    const long warp_id = tid / WARP_SIZE;
+
+    /* Row of the item that the warp should compute */
+    const int i = warp_id / K;
+
+    /* Column of the item that the warp should compute */
+    const int z = warp_id % K;
+
+    /*Starting */
+    const long col = z * N;
+
+    if (warp_id < num_elements)
+    {
+
+        int start = d_irp[i];
+        int end = d_irp[i + 1];
+
+        double sum = 0.0;
+        for (int j = start + lane; j < end; j += WARP_SIZE)
+        {
+
+            if (d_as != NULL)
+                sum += d_as[j] * d_X[col + d_ja[j]];
+            else
+                sum += 1.0 * d_X[col + d_ja[j]];
+        }
+
+        for (int offset = 16; offset > 0; offset /= 2)
+            sum += __shfl_down_sync(0xffffffff, sum, offset, 32);        
+
+        /**
+         * Only the first thread writes the result
+         */
+
+        if (lane == 0)
+        {
+            d_y[i * K + z] = sum;
+        }
+    }
+}
+
+
 /*------------------------------------------------------ CSR ADAPTIVE --------------------------------------------------------------------------------------*/
 
 /**
@@ -541,9 +615,10 @@ __global__ void CSR_Adaptive(const int M, const int N, const int K, const int nz
 
             for (int stride = blockDim.x >> 1; stride > 0; stride >>= 1)
             {
-                __syncthreads();
                 if (tid_within_block < stride)
                     LDS[tid_within_block] += LDS[tid_within_block + stride];
+
+                __syncthreads();
             }
 
             // Write result
@@ -591,7 +666,7 @@ __global__ void CSR_Adaptive_sub_blocks(const int M, const int N, const int K, c
 
     /* Number of threads in a sub-block*/
     const int sub_block_size = blockDim.x / K; // For K = 64, sub_block_size = 8
-    /*Gloabl sub-block Index*/
+    /*Local sub-block Index*/
     const int sub_block_id = threadIdx.x / sub_block_size; // For K = 64, sub_block_id = [0 - 63]
     /* Thread index within a sub-block*/
     const int tid_within_sub_block = threadIdx.x % sub_block_size; // For K = 64, tid_within_sub_block = [0 - 7]
@@ -951,7 +1026,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #elif CSR_VECTOR
 
     /* CSR Vector */
-    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    //CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    CSR_Vector_optimazed_reduction<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
 #elif CSR_VECTOR_BY_ROW
 
