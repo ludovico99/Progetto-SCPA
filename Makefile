@@ -160,7 +160,31 @@ ML_Laplace:
 	$(binDir)/app Matrici/ML_Laplace/ML_Laplace.mtx 
 
 thermal2:
-	$(binDir)/app Matrici/thermal2/thermal2.mtx 
+	$(binDir)/app Matrici/thermal2/thermal2.mtx
+
+af:
+	$(binDir)/app Matrici/af23560/af23560.mtx
+
+cavity10:
+	$(binDir)/app Matrici/cavity10/cavity10.mtx
+
+mcfe:
+	$(binDir)/app Matrici/mcfe/mcfe.mtx
+
+lung2:
+	$(binDir)/app Matrici/lung2/lung2.mtx
+
+mhda416:
+	$(binDir)/app Matrici/mhda416/mhda416.mtx
+
+olm1000:
+	$(binDir)/app Matrici/olm1000/olm1000.mtx
+
+rdist2:
+	$(binDir)/app Matrici/rdist2/rdist2.mtx
+
+west2021:
+	$(binDir)/app Matrici/west2021/west2021.mtx
 
 #------------------------------------------------------------------------- DEBUG SCRIPTS ---------------------------------------------------------------------------------------------------------
 
@@ -180,14 +204,15 @@ clean:
 #------------------------------------------------------------------------- COPY FILES ---------------------------------------------------------------------------------------------------------
 SSH_KEY = /home/${USERNAME}/.ssh/id_rsa
 
-USER = Ludovico
+USER = Luca
 
 ifeq ($(USER), Ludovico)
     DIR_SRC = /home/${USERNAME}/Scrivania/Progetto-SCPA
 	USERNAME_DEST = ludozarr99
 	DIR_DEST = /data/ludozarr99
 else
-    DIR_SRC = /home/${USERNAME}/Progetto-SCPA
+    # DIR_SRC = /home/${USERNAME}/Progetto-SCPA
+	DIR_SRC = /home/cap/Scrivania/progetto_finale_SCPA/Progetto-SCPA
 	USERNAME_DEST = lcapotombolo
 	DIR_DEST = /data/lcapotombolo
 endif
@@ -210,3 +235,6 @@ copy-headers:
 
 copy-make:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/Makefile $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
+
+copy-file:
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/cavity10.mtx $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/Matrici
