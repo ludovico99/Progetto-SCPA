@@ -13,6 +13,11 @@
 #define adaptive 0
 #define adaptive_sub_blocks 1
 
+/* This is threshold for adaptive algorithm */
+#define THR 10
+
+/* This is the size of a sub warp used in the adaptive algorithm */
+#define SUB_WARP_SIZE 2
 
 #define memory_allocation_Cuda(tipo, dimensione, puntatore)                                              \
     err = cudaMalloc((void **)&puntatore, (dimensione) * sizeof(tipo));                                  \
@@ -46,6 +51,18 @@
         exit(1);                                                                                     \
     }
 
+struct item {
+    int row;          //ROW
+    int col;          //COLUMN
+};
+
+struct core_adaptive_personalizzato
+{
+    int *metadata;
+    struct item* items_scalar;
+    struct item* items_vector;   
+};
+
 extern void check_correctness(int, int, double **, double *);
 
 extern double *convert_2D_to_1D(int, int, double **);
@@ -60,7 +77,7 @@ extern __global__ void ELLPACK_kernel(const int, const int, int *, int *, double
 extern __global__ void ELLPACK_Sub_warp(const int, const int, int *, int *, double *, int *, double *, double *, const int);
 
 #elif CSR
-extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **);
+extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **, int *);
 extern void samplings_GPU_CSR(int, int, int, double *, int *, int *);
 
 extern __global__ void CSR_Scalar_v1(const int, const int, const int, double *, int *, int *, double *, double *);

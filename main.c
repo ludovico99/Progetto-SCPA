@@ -91,12 +91,12 @@ int main(int argc, char *argv[])
 
     double **y_serial;
 
+    int *nz_per_row = NULL;
+
 #ifdef ELLPACK
     // Declaring variables for ELLPACK matrix representation
     double **values = NULL;
     int **col_indices = NULL;
-
-    int *nz_per_row = NULL;
 
 #elif CSR
 
@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
 #elif OPENMP
     double **y_parallel_omp;
 #endif
+
     /*
      * The dense matrix is a two-dimensional array represented as an array of pointers to rows,
      * where each pointer points to an array of doubles representing the columns of that specific row.
@@ -268,7 +269,7 @@ int main(int argc, char *argv[])
     // coo_to_CSR_parallel(M, N, nz, I, J, val, &as_A, &ja_A, &irp_A, nthread);
 
     /* This conversion version of CSR optimizes the previous version*/
-    coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp, nthread);
+    nz_per_row = coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp, nthread);
 
 #endif // CHECK_CONVERSION
 #endif
@@ -357,11 +358,15 @@ int main(int argc, char *argv[])
 #elif CUDA
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
-    y_parallel_cuda = CSR_GPU(M, N, K, nz, as, ja, irp, X);
+    y_parallel_cuda = CSR_GPU(M, N, K, nz, as, ja, irp, X, nz_per_row);
 
 #endif // CUDA
 
     free_CSR_data_structures(as, ja, irp);
+
+    /* Freeing the array nz_per_row */
+    if (nz_per_row != NULL)
+        free(nz_per_row);
 
 #endif // CSR
 
