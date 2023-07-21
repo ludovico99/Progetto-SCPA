@@ -15,6 +15,7 @@
 #define csr_adaptive 3
 #define csr_vector_by_row 4
 #define csr_adaptive_sub_block 5
+#define csr_adaptive_personalizzato 6
 
 /**
  *
@@ -37,7 +38,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_sub_block};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_sub_block, csr_adaptive_personalizzato};
 
     FILE *f_samplings;
     /**
@@ -88,6 +89,10 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     int sub_warp_size = 2;
 
     printf("Allocating device variables for CPU CSR product ...\n");
+
+    long *d_metadata = NULL;
+    struct item* d_items_scalar=NULL;
+    struct item* d_items_vector=NULL;
 
     if (h_as != NULL)
         /* Device allocation for the as vector containing non-zero elements */
@@ -180,6 +185,27 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 /* Number of blocks per grid */
                 blocksPerGrid = number_of_blocks - 1;
                 break;
+
+            case csr_adaptive_personalizzato:
+
+                struct core_adaptive_personalizzato *ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K);
+
+                /* Alloco e copio la struttura dati contenente i metadati */
+                memory_allocation_Cuda(long, 6, d_metadata);    
+                memcpy_to_dev(ret->metadata, d_metadata, long, 6);
+
+                /* Alloco e copio la struttura dati contenente gli elementi della matrice Y che dovranno essere computati da CSR SCALAR */
+                memory_allocation_Cuda(struct item, ret->metadata[1], d_items_scalar);    
+                memcpy_to_dev(ret->items_scalar, d_items_scalar, struct item, ret->metadata[1]);
+
+                /* Alloco e copio la struttura dati contenente gli elementi della matrice Y che dovranno essere computati da VECTOR SUB WARP */
+                memory_allocation_Cuda(struct item, ret->metadata[2], d_items_vector);    
+                memcpy_to_dev(ret->items_vector, d_items_vector, struct item, ret->metadata[2]);
+
+                /* Number of blocks per grid */
+                int blocksPerGrid=ret->metadata[0];
+                break;
+
             case csr_scalar:
 
                 threadsPerBlock = MAX_BLOCK_DIM;
@@ -250,6 +276,11 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                     /* CSR Adaptive */
                     CSR_Adaptive_sub_blocks<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
                     break;
+                
+                case csr_adaptive_personalizzato:
+                    CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
+                    break;
+
                 case csr_vector:
                     /* CSR Vector */
                     CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);

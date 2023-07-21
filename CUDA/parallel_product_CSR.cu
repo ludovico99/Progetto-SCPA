@@ -758,21 +758,116 @@ __global__ void CSR_Adaptive_sub_blocks(const int M, const int N, const int K, c
 /**
  * CSR_Adaptive_personalizzato - CSR Adaptive (variant) implementation between sparse matrix A and dense matrix X
  *
- *@param M: Number of rows of the matrix A
- *@param N: Number of columns of the matrix A, Number of rows of the matrix X
- *@param K:  Number of columns of the matrix X
- *@param nz: Number of nz
- *@param d_as: Vector containing the non-zero elements of the sparse array
- *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
- *@param d_irp: Vector containing the column index of the first nonzero of rows
- *@param X: Dense matrix
- *@param d_y: Resulting matrix
- *@param d_nz_per_row: Array containing the nz per row
+ * @param M: Number of rows of the matrix A
+ * @param N: Number of columns of the matrix A, Number of rows of the matrix X
+ * @param K:  Number of columns of the matrix X
+ * @param nz: Number of nz
+ * @param d_as: Vector containing the non-zero elements of the sparse array
+ * @param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
+ * @param d_irp: Vector containing the column index of the first nonzero of rows
+ * @param X: Dense matrix
+ * @param d_y: Resulting matrix
+ * @param d_metadata:
+ * @param d_items_scalar:
+ * @param d_items_vector:
  *
  */
-__global__ void CSR_Adaptive_personalizzato(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int *d_metadata, struct item* d_items_scalar, struct item* d_items_vector)
+__global__ void CSR_Adaptive_personalizzato(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, long *d_metadata, struct item* d_items_scalar, struct item* d_items_vector)
 {
+    int start;
+    int end;
+    long tid;
+    long block_id;
+    double partial_sum;
+    struct item elem;
 
+    /* Identificativo globale del thread */
+    tid = blockDim.x * blockIdx.x + threadIdx.x;
+
+    /* Identificativo del blocco */
+    block_id = blockIdx.x;
+
+    /* Risultato parziale per l'elemento della matrice Y */
+    partial_sum=0;
+
+    if(block_id < d_metadata[3])
+    {
+        //CSR SCALAR
+
+        /* Verifico se questo thread deve effettivamente computare un elemento con CSR SCALAR */
+        if(tid < d_metadata[1])
+        {
+            /* Struttura dati che contiene la riga e la colonna dell'elemento Yij che deve essere computato */
+            elem=d_items_scalar[tid];
+
+            start=d_irp[elem.row];
+            end=d_irp[elem.row+1];
+
+            for (int j = start; j < end; j++)
+            {
+                if (d_as != NULL)
+                    partial_sum += d_as[j] * d_X[d_ja[j] * K + elem.col];
+                else
+                    partial_sum += 1.0 * d_X[d_ja[j] * K + elem.col];
+            }   
+
+            d_y[elem.row * K + elem.col] = partial_sum;
+        }
+    }
+    else
+    {
+        //VECTOR SUB WARP
+
+        /* Verifico se questo thread deve effettivamente computare un elemento con VECTOR SUB WARP */
+        if((tid - MAX_BLOCK_DIM * d_metadata[3])< d_metadata[2])
+        {
+            __shared__ volatile double vals[MAX_BLOCK_DIM];
+
+            /* Indice del thread all'interno del sub warp */
+            const int lane= tid % SUB_WARP_SIZE;
+
+            /* Struttura dati che contiene la riga e la colonna dell'elemento Yij che deve essere computato */
+            elem=d_items_vector[tid - MAX_BLOCK_DIM * d_metadata[3]];
+
+            vals[threadIdx.x]=0.0;
+
+            start=d_irp[elem.row];
+            end=d_irp[elem.row+1];  
+
+            double sum=0.0;   
+
+            for (int j = start + lane; j < end; j+=SUB_WARP_SIZE)
+            {
+                if (d_as != NULL)
+                    sum += d_as[j] * d_X[d_ja[j] * K + elem.col];
+                else
+                    sum += 1.0 * d_X[d_ja[j] * K + elem.col];
+            }         
+
+            vals[threadIdx.x]=sum;
+
+            /**
+            * Parallel reduction in shared memory
+            */
+
+            for (int stride = SUB_WARP_SIZE >> 1; stride > 0; stride >>= 1)
+            {
+                if (lane < stride)
+                    vals[threadIdx.x] += vals[threadIdx.x + stride];
+            }
+
+            /**
+            * Only the first thread writes the result
+            */
+
+            if (lane == 0)
+            {
+                d_y[elem.row * K + elem.col] = vals[threadIdx.x];
+            }
+
+
+        }
+    }
 }
 
 
@@ -787,16 +882,17 @@ __global__ void CSR_Adaptive_personalizzato(const int M, const int N, const int 
 struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_blocks(int M, int *nz_per_row, int threadsPerBlock, int K)
 {
     int i;
-    int total_row_scalar;
-    int total_row_vector;
-    int total_threads;
-    int number_of_blocks_per_Grid;
-    int total_block_scalar;
-    int total_block_vector;
-    int *metadata;
-    struct core_adaptive_personalizzato *ret;
+    long *metadata;
+    long total_row_scalar;
+    long total_row_vector;
+    long total_threads;
+    long number_of_blocks_per_Grid;
+    long total_block_scalar;
+    long total_block_vector;
     struct item *items_scalar;
     struct item *items_vector;
+    struct core_adaptive_personalizzato *ret;
+
 
     /* Numero totale di threads, sia quelli che utilizzano CSR SCALAR che quelli che utilizzano VECTOR SUB WARP */
     total_threads=0;
@@ -888,7 +984,7 @@ struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_block
     number_of_blocks_per_Grid+=( (total_row_vector * SUB_WARP_SIZE * K) + threadsPerBlock- 1) / threadsPerBlock;
     total_block_vector=number_of_blocks_per_Grid-total_block_scalar;
 
-    metadata=(int *)malloc(sizeof(int) * 6);
+    metadata=(long *)malloc(sizeof(long) * 6);
     if(metadata==NULL) return NULL;
 
     /* Numero totale di blocchi per Griglia */
@@ -909,9 +1005,18 @@ struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_block
     /* Numero totale di threads che dovranno computare gli elementi della matrice Y */
     metadata[5]=total_threads;
 
+    printf("Numero totale dei blocchi nella griglia: %ld\n", metadata[0]);
+    printf("Numero totale dei threads che devono computare gli elementi con CSR Scalar: %ld\n", metadata[1]);
+    printf("Numero totale dei threads che devono computare gli elementi con VECTOR SUB WARP: %ld\n", metadata[2]);
+    printf("Numero totale dei blocchi per CSR SCALAR: %ld\n", metadata[3]);
+    printf("Numero totale dei blocchi per VECTOR SUB WARP: %ld\n", metadata[4]);
+    printf("Numero totale dei threads che devono computare gli elementi di Y: %ld\n", metadata[5]);
+    printf("Numero totale delle righe sopra la threshold %d: %ld\n", THR, total_row_vector);
+    printf("Numero totale delle righe sotto la threshold %d: %ld\n", THR, total_row_scalar);
+
     ret->metadata=metadata;
     ret->items_scalar=items_scalar;
-    ret->items_vector=items_vector
+    ret->items_vector=items_vector;
 
     return ret;
 }
@@ -1054,7 +1159,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 #endif
 
 #if defined(CSR_ADAPTIVE_PERSONALIZZATO)
-    int *d_metadata = NULL;
+    long *d_metadata = NULL;
     struct item* d_items_scalar=NULL;
     struct item* d_items_vector=NULL;
 #endif
@@ -1133,16 +1238,22 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #elif CSR_ADAPTIVE_PERSONALIZZATO
 
-    struct item *items_scalar ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock);
+    struct core_adaptive_personalizzato *ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K);
 
-    memory_allocation_Cuda(int, 6, d_metadata);    
-    memcpy_to_dev(ret->metadata, d_metadata, int, 6);
+    /* Alloco e copio la struttura dati contenente i metadati */
+    memory_allocation_Cuda(long, 6, d_metadata);    
+    memcpy_to_dev(ret->metadata, d_metadata, long, 6);
 
+    /* Alloco e copio la struttura dati contenente gli elementi della matrice Y che dovranno essere computati da CSR SCALAR */
     memory_allocation_Cuda(struct item, ret->metadata[1], d_items_scalar);    
     memcpy_to_dev(ret->items_scalar, d_items_scalar, struct item, ret->metadata[1]);
 
+    /* Alloco e copio la struttura dati contenente gli elementi della matrice Y che dovranno essere computati da VECTOR SUB WARP */
     memory_allocation_Cuda(struct item, ret->metadata[2], d_items_vector);    
     memcpy_to_dev(ret->items_vector, d_items_vector, struct item, ret->metadata[2]);
+
+    /* Number of blocks per grid */
+    int blocksPerGrid=ret->metadata[0];
 
 #elif CSR_VECTOR
     /* Number of elements of the product matrix Y */
@@ -1208,7 +1319,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #elif CSR_ADAPTIVE_PERSONALIZZATO
 
-    CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
+    CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
 
 #elif CSR_VECTOR
 

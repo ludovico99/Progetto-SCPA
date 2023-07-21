@@ -58,7 +58,7 @@ struct item {
 
 struct core_adaptive_personalizzato
 {
-    int *metadata;
+    long *metadata;
     struct item* items_scalar;
     struct item* items_vector;   
 };
@@ -78,7 +78,7 @@ extern __global__ void ELLPACK_Sub_warp(const int, const int, int *, int *, doub
 
 #elif CSR
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **, int *);
-extern void samplings_GPU_CSR(int, int, int, double *, int *, int *);
+extern void samplings_GPU_CSR(int, int, int, double *, int *, int *, int *);
 
 extern __global__ void CSR_Scalar_v1(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Scalar_v2(const int, const int, const int, double *, int *, int *, double *, double *);
@@ -88,7 +88,9 @@ extern __global__ void CSR_Vector(const int, const int, const int, const int, do
 extern __global__ void CSR_Vector_by_row(const int, const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Adaptive(const int, const int, const int, const int, double *, int *, int *, double *, double *, int *);
 extern __global__ void CSR_Adaptive_sub_blocks(const int, const int, const int, const int, double *, int *, int *, double *, double *, int *);
+__global__ void CSR_Adaptive_personalizzato(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, long *d_metadata, struct item* d_items_scalar, struct item* d_items_vector);
 extern int csr_adaptive_rowblocks(int, int, int, int *, int **, int *, int);
+extern struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_blocks(int M, int *nz_per_row, int threadsPerBlock, int K);
 
 #endif
 #endif
