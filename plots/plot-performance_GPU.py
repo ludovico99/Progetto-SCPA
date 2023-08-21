@@ -11,7 +11,7 @@ samplings_csr_vector = [[], []]
 samplings_csr_vector_by_row = [[], []]
 samplings_csr_vector_sw = [[], []]
 samplings_csr_adaptive = [[], []]
-samplings_csr_adaptive_sb = [[], []]
+samplings_csr_adaptive_p = [[], []]
 
 samplings_ellpack = [[], []]
 samplings_ellpack_sub_warp = [[], []]
@@ -46,9 +46,9 @@ def print_all_results_CSR():
     variance_adaptive = samplings_csr_adaptive[1]
     std_adaptive = np.sqrt(variance_adaptive)
 
-    mean_adaptive_sb = samplings_csr_adaptive_sb[0]
-    variance_adaptive_sb = samplings_csr_adaptive_sb[1]
-    std_adaptive_sb = np.sqrt(variance_adaptive_sb)
+    mean_adaptive_p = samplings_csr_adaptive_p[0]
+    variance_adaptive_p = samplings_csr_adaptive_p[1]
+    std_adaptive_p = np.sqrt(variance_adaptive_p)
 
     ax.plot(K, mean_scalar, marker='o', markersize=2,
             label="GLOPS for CSR SCALAR", linewidth=0.5, color='indigo')
@@ -86,10 +86,10 @@ def print_all_results_CSR():
     ax.fill_between(K, ci[0], ci[1],
                     color='green', alpha=0.1)
 
-    ax.plot(K, mean_adaptive_sb, marker='o', markersize=2,
-            label="GLOPS for CSR ADAPTIVE SUB-BLOCK", linewidth=0.5, color='cyan')
-    ci = stats.t.interval(0.995, n-1, loc=mean_adaptive_sb,
-                          scale=std_adaptive_sb/np.sqrt(n))
+    ax.plot(K, mean_adaptive_p, marker='o', markersize=2,
+            label="GLOPS for CSR ADAPTIVE PERSONALIZZATO", linewidth=0.5, color='cyan')
+    ci = stats.t.interval(0.995, n-1, loc=mean_adaptive_p,
+                          scale=std_adaptive_p/np.sqrt(n))
     ax.fill_between(K, ci[0], ci[1],
                     color='cyan', alpha=0.1)
 
@@ -179,9 +179,9 @@ for row in df_parallel.itertuples(index=False):
         elif (row[0] == "csr_adaptive"):
             samplings_csr_adaptive[0].append(row[2])
             samplings_csr_adaptive[1].append(row[3])
-        elif (row[0] == "csr_adaptive_sub_block"):
-            samplings_csr_adaptive_sb[0].append(row[2])
-            samplings_csr_adaptive_sb[1].append(row[3])
+        elif (row[0] == "csr_adaptive_personalizzato"):
+            samplings_csr_adaptive_p[0].append(row[2])
+            samplings_csr_adaptive_p[1].append(row[3])
         elif (row[0] == "csr_vector_sub_warp"):
             samplings_csr_vector_sw[0].append(row[2])
             samplings_csr_vector_sw[1].append(row[3])

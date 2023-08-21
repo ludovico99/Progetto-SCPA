@@ -628,131 +628,7 @@ __global__ void CSR_Adaptive(const int M, const int N, const int K, const int nz
     }
 }
 
-/*------------------------------------------------------ CSR ADAPTIVE SUB_BLOCKS --------------------------------------------------------------------------------------*/
 
-/**
- * CSR_Adaptive_sub_blocks - CSR Adaptive (variant) implementation between sparse matrix A and dense matrix X
- *
- * CSR-Adapive is an algorithm that dynamically decides whether to use CSR-Stream or CSR-Vector.
- * Each kernel computes the i-th row in the resulting matrix.
- * The shared memory has size MAX_BLOCK_DIM = 512.
- * For K = 64 each block has at most 512 / 64 = 8 non-zeroes if CSR stream should be run.
- * There are 8 threads calculating the k-th element of the i-th row for every k from 0 to 63
- *
- *@param M: Number of rows of the matrix A
- *@param N: Number of columns of the matrix A, Number of rows of the matrix X
- *@param K:  Number of columns of the matrix X
- *@param nz: Number of nz
- *@param d_as: Vector containing the non-zero elements of the sparse array
- *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
- *@param d_irp: Vector containing the column index of the first nonzero of rows
- *@param X: Dense matrix
- *@param d_y: Resulting matrix
- *@param d_rowBlocks: Array containing the starting row index per block
- *
- */
-__global__ void CSR_Adaptive_sub_blocks(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int *d_rowBlocks)
-{
-
-    extern __shared__ volatile double LDS[];
-
-    const int my_block = blockIdx.x;
-
-    const int startRow = d_rowBlocks[my_block];
-
-    const int nextStartRow = d_rowBlocks[my_block + 1];
-
-    const int num_rows = nextStartRow - startRow;
-
-    /* Number of threads in a sub-block*/
-    const int sub_block_size = blockDim.x / K; // For K = 64, sub_block_size = 8
-    /*Local sub-block Index*/
-    const int sub_block_id = threadIdx.x / sub_block_size; // For K = 64, sub_block_id = [0 - 63]
-    /* Thread index within a sub-block*/
-    const int tid_within_sub_block = threadIdx.x % sub_block_size; // For K = 64, tid_within_sub_block = [0 - 7]
-    /*Number of sub-block in a block*/
-    const int num_sub_blocks = blockDim.x / sub_block_size; // For K = 64, num_sub_blocks = 64
-
-    if (nextStartRow <= M)
-    {
-
-        // If the block consists of more than one row then run CSR Stream
-        if (num_rows > 1)
-        {
-            int nnz = 0;
-
-            nnz = d_irp[nextStartRow] - d_irp[startRow];
-
-            int first_col = d_irp[startRow];
-
-            for (int z = sub_block_id; z < K; z += num_sub_blocks)
-            {
-                // Each thread writes to shared memory
-                if (tid_within_sub_block < nnz)
-                {
-                    if (d_as != NULL)
-                        LDS[threadIdx.x] = d_as[first_col + tid_within_sub_block] * d_X[z * N + d_ja[first_col + tid_within_sub_block]];
-                    else
-                        LDS[threadIdx.x] = 1.0 * d_X[z * N + d_ja[first_col + tid_within_sub_block]];
-                }
-                __syncthreads();
-
-                // sub_block_size threads perform Scalar Reduction out of LDS to compute final output
-                for (int i = startRow + tid_within_sub_block; i < nextStartRow; i += sub_block_size)
-                {
-
-                    int start = d_irp[i];
-                    int end = d_irp[i + 1];
-
-                    double temp = 0.0;
-                    for (int j = (start - first_col); j < (end - first_col); j++)
-                    {
-                        temp += LDS[j + z * sub_block_size];
-                    }
-
-                    d_y[i * K + z] = temp;
-                }
-            }
-        }
-        // If the block consists of only one row then run CSR Vector
-        else
-        {
-            int rowStart = d_irp[startRow];
-
-            int rowEnd = d_irp[nextStartRow];
-
-            for (int z = sub_block_id; z < K; z += num_sub_blocks)
-            {
-                double sum = 0.0;
-
-                // Use all threads in a warp to accumulate multiplied elements
-                for (int j = rowStart + tid_within_sub_block; j < rowEnd; j += sub_block_size)
-                {
-                    if (d_as != NULL)
-                        sum += d_as[j] * d_X[z * N + d_ja[j]];
-                    else
-                        sum += 1.0 * d_X[z * N + d_ja[j]];
-                }
-
-                LDS[threadIdx.x] = sum;
-                __syncthreads();
-
-                // Reduce partial sums
-
-                for (int stride = sub_block_size >> 1; stride > 0; stride >>= 1)
-                {
-                    __syncthreads();
-                    if (tid_within_sub_block < stride)
-                        LDS[tid_within_sub_block + z * sub_block_size] += LDS[tid_within_sub_block + z * sub_block_size + stride];
-                }
-
-                // Write result
-                if (tid_within_sub_block == 0)
-                    d_y[startRow * K + z] = LDS[tid_within_sub_block + z * sub_block_size];
-            }
-        }
-    }
-}
 
 
 /**
@@ -1037,7 +913,7 @@ struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_block
  *
  * */
 
-int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int *threadsPerBlock, int mode)
+int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int *threadsPerBlock)
 {
 
     int sum_nz = 0, last_i = 0, ctr = 1, local_size;
@@ -1045,22 +921,19 @@ int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int 
 
     (*rowBlocks)[0] = 0;
 
-    if (mode == adaptive_sub_blocks) 
-        local_size = MAX_BLOCK_DIM / K; 
-    else
-    {
+    
 
-        // int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
-        // int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
+    // int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
+    // int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
 
-        /*Computing the average number of non-zeroes per row*/
-        local_size = pow(2, floor(log2((nz + M - 1) / M)));
+    /*Computing the average number of non-zeroes per row*/
+    local_size = pow(2, floor(log2((nz + M - 1) / M)));
 
-        if (local_size < WARP_SIZE)
-            local_size = WARP_SIZE;
-        if (local_size > MAX_BLOCK_DIM)
-            local_size = MAX_BLOCK_DIM; // Surely MAX_BLOCK_DIM * 8 bytes is less than sh_memory_per_block bytes
-    }
+    if (local_size < WARP_SIZE)
+        local_size = WARP_SIZE;
+    if (local_size > MAX_BLOCK_DIM)
+        local_size = MAX_BLOCK_DIM; // Surely MAX_BLOCK_DIM * 8 bytes is less than sh_memory_per_block bytes
+    
 
     for (int i = 1; i <= M; i++)
     {
@@ -1093,10 +966,7 @@ int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int 
             (*rowBlocks)[ctr++] = M; // Inserting last start row if it has not been previuosly inserted
     }
     
-    if (mode == adaptive_sub_blocks)
-        *threadsPerBlock = MAX_BLOCK_DIM;
-    else
-        *threadsPerBlock = local_size;
+    *threadsPerBlock = local_size;
 
     return ctr;
 }
@@ -1153,7 +1023,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     float expireTimeMsec = 0.0;
 
-#if defined(CSR_ADAPTIVE) || defined(CSR_ADAPTIVE_SUB_BLOCK)
+#if defined(CSR_ADAPTIVE)
     int *rowBlocks = NULL;
     int *d_rowBlocks = NULL;
 #endif
@@ -1164,7 +1034,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     struct item* d_items_vector=NULL;
 #endif
 
-#if defined(CSR_ADAPTIVE) || defined(CSR_ADAPTIVE_SUB_BLOCK) || defined(CSR_VECTOR) || defined(CSR_VECTOR_BY_ROW)
+#if defined(CSR_ADAPTIVE) || defined(CSR_VECTOR) || defined(CSR_VECTOR_BY_ROW)
     h_X = transpose_from_2D(N, K, X);
 #else
     /* 2D to 1D dense matrix X conversion*/
@@ -1212,7 +1082,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #ifdef CSR_ADAPTIVE
 
-    int number_of_blocks = csr_adaptive_rowblocks(M, K, nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive);
+    int number_of_blocks = csr_adaptive_rowblocks(M, K, nz, h_irp, &rowBlocks, &threadsPerBlock);
 
     /* Device allocation for d_rowBlocks */
     memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -1222,19 +1092,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     /* Number of blocks per grid */
     int blocksPerGrid = (number_of_blocks - 1) * K;
-
-#elif CSR_ADAPTIVE_SUB_BLOCK
-
-    int number_of_blocks = csr_adaptive_rowblocks(M, K, nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive_sub_blocks);
-
-    // /* Device allocation for d_rowBlocks */
-    memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
-
-    // /* Copy rowBlocks from the Host to the Device*/
-    memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
-
-    /* Number of blocks per grid */
-    int blocksPerGrid = number_of_blocks - 1;
 
 #elif CSR_ADAPTIVE_PERSONALIZZATO
 
@@ -1313,10 +1170,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* CSR Adaptive */
     CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
 
-#elif CSR_ADAPTIVE_SUB_BLOCK
-
-    CSR_Adaptive_sub_blocks<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
-
 #elif CSR_ADAPTIVE_PERSONALIZZATO
 
     CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
@@ -1377,7 +1230,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     free_memory_Cuda(d_X);
     free_memory_Cuda(d_y);
 
-#if defined(CSR_ADAPTIVE) || defined(CSR_ADAPTIVE_SUB_BLOCK)
+#if defined(CSR_ADAPTIVE)
     free_memory_Cuda(d_rowBlocks);
 #endif
 
@@ -1389,7 +1242,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     free(h_X);
 
-#if defined(CSR_ADAPTIVE) || defined(CSR_ADAPTIVE_SUB_BLOCK)
+#if defined(CSR_ADAPTIVE)
     free(rowBlocks);
 #endif
 

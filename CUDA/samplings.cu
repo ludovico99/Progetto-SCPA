@@ -14,8 +14,7 @@
 #define csr_vector_sub_warp 2
 #define csr_adaptive 3
 #define csr_vector_by_row 4
-#define csr_adaptive_sub_block 5
-#define csr_adaptive_personalizzato 6
+#define csr_adaptive_personalizzato 5
 
 /**
  *
@@ -30,7 +29,7 @@
  * @param h_irp: Vector of the start index of each row
 
  */
-void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp)
+void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp, int *nz_per_row)
 {
     cudaError_t err = cudaSuccess;
     cudaEvent_t start, stop;
@@ -38,7 +37,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_sub_block, csr_adaptive_personalizzato};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_personalizzato};
 
     FILE *f_samplings;
     /**
@@ -49,10 +48,12 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     // HOST
     double *h_y = NULL;
     double *h_X = NULL;
+    double *h_X_t = NULL;
 
     // DEVICE
     double *d_y = NULL;
     double *d_X = NULL;
+    double *d_X_t = NULL;
     double *d_as = NULL;
     int *d_ja = NULL;
     int *d_irp = NULL;
@@ -82,17 +83,15 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of sub-warps per block*/
     int subWarpsPerBlock;
 
-    // /* sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
-    // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
-    // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
-
     int sub_warp_size = 2;
 
     printf("Allocating device variables for CPU CSR product ...\n");
 
+	// CSR ADAPTIVE PERSONALIZZATO
     long *d_metadata = NULL;
     struct item* d_items_scalar=NULL;
     struct item* d_items_vector=NULL;
+    struct core_adaptive_personalizzato *ret;
 
     if (h_as != NULL)
         /* Device allocation for the as vector containing non-zero elements */
@@ -140,19 +139,25 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
         /* Y array host memory allocation */
         memory_allocation_Cuda(double, M *K[k], d_y);
+        
         /* The output matrix is initialized with all zeroes */
         cudaMemset(d_y, 0, M * K[k] * sizeof(double));
 
-        /**
-         * Creating the X matrix with its number of columns specified by K[k]
-         */
+        /* Creating the X matrix with its number of columns specified by K[k] */
 
         create_dense_matrix_1D(N, K[k], &h_X);
+        
+        h_X_t = transpose_from_1D(N, K[k], h_X);
 
         /* Device allocation for dense matrix X */
         memory_allocation_Cuda(double, N *K[k], d_X);
 
         memcpy_to_dev(h_X, d_X, double, N *K[k]);
+        
+        /* Device allocation for dense matrix X */
+        memory_allocation_Cuda(double, N *K[k], d_X_t);
+
+        memcpy_to_dev(h_X_t, d_X_t, double, N *K[k]);
 
         /* Number of elements of the product matrix Y */
         numElements = M * K[k];
@@ -164,7 +169,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             {
             case csr_adaptive:
 
-                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive);
+                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock);
 
                 /* Device allocation for d_rowBlocks */
                 memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
@@ -175,20 +180,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 blocksPerGrid = (number_of_blocks - 1) * K[k];
                 break;
 
-            case csr_adaptive_sub_block:
-
-                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock, adaptive_sub_blocks);
-                /* Device allocation for d_rowBlocks */
-                memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
-                /* Copy rowBlocks from the Host to the Device*/
-                memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
-                /* Number of blocks per grid */
-                blocksPerGrid = number_of_blocks - 1;
-                break;
-
             case csr_adaptive_personalizzato:
 
-                struct core_adaptive_personalizzato *ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K);
+                ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K[k]);
 
                 /* Alloco e copio la struttura dati contenente i metadati */
                 memory_allocation_Cuda(long, 6, d_metadata);    
@@ -203,7 +197,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 memcpy_to_dev(ret->items_vector, d_items_vector, struct item, ret->metadata[2]);
 
                 /* Number of blocks per grid */
-                int blocksPerGrid=ret->metadata[0];
+                blocksPerGrid=ret->metadata[0];
                 break;
 
             case csr_scalar:
@@ -270,25 +264,22 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 {
                 case csr_adaptive:
                     /* CSR Adaptive */
-                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
-                    break;
-                case csr_adaptive_sub_block:
-                    /* CSR Adaptive */
-                    CSR_Adaptive_sub_blocks<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
+                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y, d_rowBlocks);
                     break;
                 
                 case csr_adaptive_personalizzato:
-                    CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
+                	/* CSR Adaptive personalizzato */
+                    CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
                     break;
 
                 case csr_vector:
                     /* CSR Vector */
-                    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
+                    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y);
                     break;
+                    
                 case csr_vector_by_row:
-
-                    CSR_Vector_by_row<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
-
+					/* CSR Vector By Row */
+                    CSR_Vector_by_row<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y);
                     break;
 
                 case csr_vector_sub_warp:
@@ -297,15 +288,12 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                     break;
 
                 case csr_scalar:
-
+					/* CSR Scalar */
                     /* Versione accesso alla memoria globale non ottimizzato */
                     // CSR_Scalar_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
-
                     // CSR_Scalar_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
-
                     /* Versione accesso alla memoria globale ottimizzato */
                     CSR_Scalar_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
-
                     break;
 
                 default:
@@ -352,20 +340,30 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 free_memory_Cuda(d_rowBlocks);
                 free(rowBlocks);
                 break;
-            case csr_adaptive_sub_block:
-                fprintf(f_samplings, "csr_adaptive_sub_block,%d, %lf,%.20lf\n", K[k], Gflops, variance);
-                free_memory_Cuda(d_rowBlocks);
-                free(rowBlocks);
+                
+            case csr_adaptive_personalizzato:
+                fprintf(f_samplings, "csr_adaptive_personalizzato,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                free_memory_Cuda(d_metadata);
+                free_memory_Cuda(d_items_scalar);
+                free_memory_Cuda(d_items_vector);
+                free(ret->metadata);
+    			free(ret->items_scalar);
+    			free(ret->items_vector);
+                free(ret);
                 break;
+
             case csr_vector:
                 fprintf(f_samplings, "csr_vector,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
+                
             case csr_vector_by_row:
                 fprintf(f_samplings, "csr_vector_by_row,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
+                
             case csr_vector_sub_warp:
                 fprintf(f_samplings, "csr_vector_sub_warp,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
+                
             case csr_scalar:
                 fprintf(f_samplings, "csr_scalar,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 break;
@@ -380,8 +378,10 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
         }
 
         free_memory_Cuda(d_X);
+        free_memory_Cuda(d_X_t);
         free_memory_Cuda(d_y);
         free(h_X);
+        free(h_X_t);
         free(h_y);
     }
 

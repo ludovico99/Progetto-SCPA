@@ -27,8 +27,6 @@ ifeq ($(MODE), csr)
     DEFINES = -DCUDA -DCSR
 else ifeq ($(MODE), csr_adaptive) 
     DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE
-else ifeq ($(MODE), csr_adaptive_sub_block) 
-	DEFINES = -DCUDA -DCSR -DCSR_ADAPTIVE_SUB_BLOCK
 else ifeq ($(MODE), csr_vector) 
 	DEFINES = -DCUDA -DCSR -DCSR_VECTOR
 else ifeq ($(MODE), csr_vector_by_row) 
