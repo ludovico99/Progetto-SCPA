@@ -11,6 +11,8 @@
 
 #include "../include/header.h"
 
+int THR = 100;
+
 /*------------------------------------------------------ CSR SCALAR --------------------------------------------------------------------------------------*/
 
 /**
@@ -1158,6 +1160,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K, blocksPerGrid,
            threadsPerBlock);
+           
+//	checkCudaErrors(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
 
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));

@@ -237,4 +237,4 @@ copy-make:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/Makefile $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
 
 copy-file:
-	scp -i $(SSH_KEY)  -r $(DIR_SRC)/cavity10.mtx $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/Matrici
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/cavity10 $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/Matrici

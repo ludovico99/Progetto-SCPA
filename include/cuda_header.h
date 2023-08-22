@@ -14,7 +14,7 @@
 #define adaptive_sub_blocks 1
 
 /* This is threshold for adaptive algorithm */
-#define THR 10
+//#define THR 10
 
 /* This is the size of a sub warp used in the adaptive algorithm */
 #define SUB_WARP_SIZE 2
@@ -59,7 +59,9 @@ struct item {
 struct core_adaptive_personalizzato
 {
     long *metadata;
+    //Per ogni thread mantiene l'elemento di Y che dovrà calcolare
     struct item* items_scalar;
+    //Per ogni thread mantiene l'elemento di Y che dovrà calcolare
     struct item* items_vector;   
 };
 
@@ -79,6 +81,7 @@ extern __global__ void ELLPACK_Sub_warp(const int, const int, int *, int *, doub
 #elif CSR
 extern double *CSR_GPU(int, int, int, int, double *, int *, int *, double **, int *);
 extern void samplings_GPU_CSR(int, int, int, double *, int *, int *, int *);
+extern void samplings_GPU_CSR_flush_cache(int, int, int, double *, int *, int *, int *);
 
 extern __global__ void CSR_Scalar_v1(const int, const int, const int, double *, int *, int *, double *, double *);
 extern __global__ void CSR_Scalar_v2(const int, const int, const int, double *, int *, int *, double *, double *);

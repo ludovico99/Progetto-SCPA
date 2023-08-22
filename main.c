@@ -291,7 +291,8 @@ int main(int argc, char *argv[])
 #ifdef CSR
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
-    samplings_GPU_CSR(M, N, nz, as, ja, irp, nz_per_row);
+    //samplings_GPU_CSR(M, N, nz, as, ja, irp, nz_per_row);
+    samplings_GPU_CSR_flush_cache(M, N, nz, as, ja, irp, nz_per_row);
 
 #elif ELLPACK
 
