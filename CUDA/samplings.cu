@@ -380,8 +380,8 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
 /**
  *
- * samplings_GPU_CSR - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
- * The overall results are written in a proper .csv file.
+ * samplings_GPU_CSR_dev_res - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
+ * The overall results are written in a proper .csv file. It esecutes the function cudaDeviceReset()
  *
  * @param M: Number of rows
  * @param N: Number of columns
@@ -391,7 +391,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
  * @param h_irp: Vector of the start index of each row
 
  */
-void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp, int *nz_per_row)
+void samplings_GPU_CSR_dev_res(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp, int *nz_per_row)
 {
     cudaError_t err = cudaSuccess;
     cudaEvent_t start, stop;
@@ -1057,8 +1057,8 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
 
 /**
 *
-* samplings_GPU_ELLPACK_flush_cache - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
-* The overall results are written in a proper .csv file. The cache is properly flushed
+* samplings_GPU_ELLPACK_dev_res - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
+* The overall results are written in a proper .csv file. It executes the cudaDeviceReset()
 *
 * @param M: Number of rows
 * @param N: Number of columns
@@ -1069,7 +1069,7 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
 */
  
 
-void samplings_GPU_ELLPACK_flush_cache(int M, int N, int nz, int *nz_per_row, double **values, int **col_indices)
+void samplings_GPU_ELLPACK_dev_res(int M, int N, int nz, int *nz_per_row, double **values, int **col_indices)
 {
     // Error code to check return values for CUDA calls
     cudaError_t err = cudaSuccess;
