@@ -144,10 +144,13 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
                 * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
                 * It achieves this by updating the mean and variance incrementally as new values are encountered.
                 */
-
+            
                 curr_Gflops = compute_GFLOPS(K[k], nz, time * 1e9);
-                mean = calculate_mean(time, mean, curr_samp + 1);
+                
                 M2 = calculate_M2(time, mean, M2, curr_samp + 1);
+
+                mean = calculate_mean(time, mean, curr_samp + 1);
+
                 Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
 
                 /**
@@ -156,8 +159,8 @@ void computing_samplings_openMP(int M, int N, int nz, int *nz_per_row, double **
                 free_y(M, y);
             }
 
-            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (SAMPLING_SIZE - 1);
+            /*After processing all values, the variance can be calculated as M2 / (n).*/
+            variance = M2 / SAMPLING_SIZE;
             /**
              * Writing in the file the overall mean and variance
             */

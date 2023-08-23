@@ -296,13 +296,16 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                  * It achieves this by updating the mean and variance incrementally as new values are encountered.
                  */
 
+                
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
             }
-            
-            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (SAMPLING_SIZE - 1);
+            /*After processing all values, the variance can be calculated as M2 / (n).*/
+            variance = M2 / (SAMPLING_SIZE);
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
 
@@ -535,6 +538,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
             variance = 0.0;
             Gflops = 0.0;
             curr_Gflops = 0.0;
+
             for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
             {
             	
@@ -632,6 +636,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
                     /* CSR Vector */
                     // START TIMER
                 	checkCudaErrors(cudaEventRecord(start, stream));
+
                     CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y);
 		            // STOP TIMER
 		            checkCudaErrors(cudaEventRecord(stop, stream));
@@ -643,6 +648,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 					/* CSR Vector By Row */
 					// START TIMER
                 	checkCudaErrors(cudaEventRecord(start, stream));
+
                     CSR_Vector_by_row<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y);
 		            // STOP TIMER
 		            checkCudaErrors(cudaEventRecord(stop, stream));
@@ -654,6 +660,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
                     /* CSR Vector with sub-warps*/
 					// START TIMER
                 	checkCudaErrors(cudaEventRecord(start, stream));
+
                     CSR_Vector_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, sub_warp_size);
 		            // STOP TIMER
 		            checkCudaErrors(cudaEventRecord(stop, stream));
@@ -667,8 +674,10 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
                     // CSR_Scalar_v1<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
                     // CSR_Scalar_v2<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
                     /* Versione accesso alla memoria globale ottimizzato */
+
 					// START TIMER
                 	checkCudaErrors(cudaEventRecord(start, stream));
+
                     CSR_Scalar_v3<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], nz, d_as, d_ja, d_irp, d_X, d_y);
 		            // STOP TIMER
 		            checkCudaErrors(cudaEventRecord(stop, stream));
@@ -690,21 +699,24 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
                     exit(EXIT_FAILURE);
                 }
 
+                free_memory_Cuda(d_X);
+				free_memory_Cuda(d_X_t);
+				free_memory_Cuda(d_y);
+
                 /**
                  * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
                  * It achieves this by updating the mean and variance incrementally as new values are encountered.
                  */
-
+                    
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
-				free_memory_Cuda(d_X);
-				free_memory_Cuda(d_X_t);
-				free_memory_Cuda(d_y);
+
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
             }
-            
-            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (SAMPLING_SIZE - 1);
+            /*After processing all values, the variance can be calculated as M2 / (n).*/
+            variance = M2 / (SAMPLING_SIZE);
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
 
@@ -768,17 +780,6 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
     return;
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -847,11 +848,6 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
     int blocksPerGrid;
     /*Total number of elements to be computed*/
     int numElements;
-
-    /*sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row*/
-    // int sub_warp_size = pow(2, floor(log2((nz + M - 1) / M)));
-    // if (sub_warp_size > WARP_SIZE)
-    //     sub_warp_size = WARP_SIZE;
 
     int sub_warp_size = 2;
 
@@ -992,11 +988,14 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
                  */
 
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
             }
-            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (SAMPLING_SIZE - 1);
+            /*After processing all values, the variance can be calculated as M2 / (n).*/
+            variance = M2 / (SAMPLING_SIZE);
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops);
 
@@ -1282,11 +1281,14 @@ void samplings_GPU_ELLPACK_flush_cache(int M, int N, int nz, int *nz_per_row, do
  
 
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+
             }
-            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
-            variance = M2 / (SAMPLING_SIZE - 1);
+            /*After processing all values, the variance can be calculated as M2 / (n).*/
+            variance = M2 / (SAMPLING_SIZE);
 
             printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops); 
 

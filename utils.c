@@ -458,7 +458,7 @@ void get_time(struct timespec *time)
  */
 double calculate_mean(double x, double mean, int n)
 {
-    mean += (x - mean) / n; //Updating the mean
+    mean += ((x - mean) / n); //Updating the mean
     return mean;
 }
 
@@ -480,8 +480,8 @@ double calculate_M2(double x, double mean, double M2, int n)
     {
         return 0.0;
     }
-    double delta = x - mean;
-    mean = calculate_mean(x, mean, n);
-    M2 += delta * (x - mean);
+    double square = (x - mean) * (x - mean);
+    M2 += (square * ( (n-1) / (double) n));
+    
     return M2; 
 }
