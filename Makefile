@@ -234,5 +234,8 @@ copy-headers:
 copy-make:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/Makefile $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
 
+copy-main:
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/main.c $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
+
 copy-file:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/cavity10 $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/Matrici

@@ -232,6 +232,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             variance = 0.0;
             Gflops = 0.0;
             curr_Gflops = 0.0;
+
             for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
             {
 		
@@ -709,7 +710,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
                  */
                     
                 curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
-
+                
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
 
                 Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);

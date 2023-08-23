@@ -770,6 +770,11 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Y array host memory allocation */
     memory_allocation(double, M *K, h_y);
 
+    if (cudaDeviceReset() != cudaSuccess) {
+		printf("cudaDeviceReset failed!\n");
+		exit(1);
+	}
+
     printf("Allocating device variables for CPU CSR product ...\n");
 
     /* Y array host memory allocation */
