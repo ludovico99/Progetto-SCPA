@@ -10,7 +10,6 @@ samplings_csr_scalar = [[], []]
 samplings_csr_vector = [[], []]
 samplings_csr_vector_by_row = [[], []]
 samplings_csr_vector_sw = [[], []]
-samplings_csr_adaptive = [[], []]
 samplings_csr_adaptive_p = [[], []]
 
 samplings_ellpack = [[], []]
@@ -41,10 +40,6 @@ def print_all_results_CSR():
     mean_vector_sw = samplings_csr_vector_sw[0]
     variance_vector_sw = samplings_csr_vector_sw[1]
     std_vector_sw = np.sqrt(variance_vector_sw)
-
-    mean_adaptive = samplings_csr_adaptive[0]
-    variance_adaptive = samplings_csr_adaptive[1]
-    std_adaptive = np.sqrt(variance_adaptive)
 
     mean_adaptive_p = samplings_csr_adaptive_p[0]
     variance_adaptive_p = samplings_csr_adaptive_p[1]
@@ -78,13 +73,6 @@ def print_all_results_CSR():
 
     ax.fill_between(K, ci[0], ci[1],
                     color='blue', alpha=0.1)
-
-    ax.plot(K, mean_adaptive, marker='o', markersize=2,
-            label="GLOPS for CSR ADAPTIVE", linewidth=0.5, color='green')
-    ci = stats.t.interval(0.995, n-1, loc=mean_adaptive,
-                          scale=std_adaptive/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='green', alpha=0.1)
 
     ax.plot(K, mean_adaptive_p, marker='o', markersize=2,
             label="GLOPS for CSR ADAPTIVE PERSONALIZZATO", linewidth=0.5, color='cyan')
@@ -176,9 +164,6 @@ for row in df_parallel.itertuples(index=False):
         elif (row[0] == "csr_vector_by_row"):
             samplings_csr_vector_by_row[0].append(row[2])
             samplings_csr_vector_by_row[1].append(row[3])
-        elif (row[0] == "csr_adaptive"):
-            samplings_csr_adaptive[0].append(row[2])
-            samplings_csr_adaptive[1].append(row[3])
         elif (row[0] == "csr_adaptive_personalizzato"):
             samplings_csr_adaptive_p[0].append(row[2])
             samplings_csr_adaptive_p[1].append(row[3])

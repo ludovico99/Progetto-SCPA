@@ -12,9 +12,8 @@
 #define csr_scalar 0
 #define csr_vector 1
 #define csr_vector_sub_warp 2
-#define csr_adaptive 3
-#define csr_vector_by_row 4
-#define csr_adaptive_personalizzato 5
+#define csr_vector_by_row 3
+#define csr_adaptive_personalizzato 4
 
 /**
  *
@@ -37,7 +36,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_personalizzato};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_vector_by_row, csr_adaptive_personalizzato};
 
     FILE *f_samplings;
     /**
@@ -66,18 +65,12 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
     float expireTimeMsec = 0.0;
 
-    // CSR ADAPTIVE variables
-    int *rowBlocks = NULL;
-    int *d_rowBlocks = NULL;
-
     /* Number of threads per block */
     int threadsPerBlock = MAX_BLOCK_DIM;
     /* Number of blocks per grid */
     int blocksPerGrid;
     /* Number of elements in the resulting matrix y */
     int numElements;
-    /*Number of blocks to be spawned in the adaptive algorithm */
-    int number_of_blocks;
     /* Number of warps per block*/
     int warpsPerBlock;
     /* Number of sub-warps per block*/
@@ -167,24 +160,9 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
             switch (i)
             {
-            case csr_adaptive:
-
-                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock);
-
-                /* Device allocation for d_rowBlocks */
-                memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
-
-                /* Copy rowBlocks from the Host to the Device*/
-                memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
-                /* Number of blocks per grid */
-                blocksPerGrid = (number_of_blocks - 1) * K[k];
-                break;
-
             case csr_adaptive_personalizzato:
 
                 ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K[k]);
-
-		//printf("THR = %d\n", THR);
 		
                 /* Alloco e copio la struttura dati contenente i metadati */
                 memory_allocation_Cuda(long, 6, d_metadata);    
@@ -257,19 +235,14 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
             for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
             {
 		
-                printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid,
-                       threadsPerBlock);
+                printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid, threadsPerBlock);
                 fflush(stdout);
+                
                 // START TIMER
                 checkCudaErrors(cudaEventRecord(start, stream));
 
                 switch (i)
                 {
-                case csr_adaptive:
-                    /* CSR Adaptive */
-                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y, d_rowBlocks);
-                    break;
-                
                 case csr_adaptive_personalizzato:
                 	/* CSR Adaptive personalizzato */
                     CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
@@ -327,6 +300,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
                 Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
                 M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
             }
+            
             /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
             variance = M2 / (SAMPLING_SIZE - 1);
 
@@ -338,12 +312,7 @@ void samplings_GPU_CSR(int M, int N, int nz, double *h_as, int *h_ja, int *h_irp
 
             switch (i)
             {
-            case csr_adaptive:
-                fprintf(f_samplings, "csr_adaptive,%d, %lf,%.20lf\n", K[k], Gflops, variance);
-                free_memory_Cuda(d_rowBlocks);
-                free(rowBlocks);
-                break;
-                
+            
             case csr_adaptive_personalizzato:
                 fprintf(f_samplings, "csr_adaptive_personalizzato,%d, %lf,%.20lf\n", K[k], Gflops, variance);
                 free_memory_Cuda(d_metadata);
@@ -426,7 +395,7 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
     int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
 
-    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_adaptive, csr_vector_by_row, csr_adaptive_personalizzato};
+    int modes[] = {csr_scalar, csr_vector, csr_vector_sub_warp, csr_vector_by_row, csr_adaptive_personalizzato};
 
     FILE *f_samplings;
     /**
@@ -455,18 +424,12 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
     float expireTimeMsec = 0.0;
 
-    // CSR ADAPTIVE variables
-    int *rowBlocks = NULL;
-    int *d_rowBlocks = NULL;
-
     /* Number of threads per block */
     int threadsPerBlock = MAX_BLOCK_DIM;
     /* Number of blocks per grid */
     int blocksPerGrid;
     /* Number of elements in the resulting matrix y */
     int numElements;
-    /*Number of blocks to be spawned in the adaptive algorithm */
-    int number_of_blocks;
     /* Number of warps per block*/
     int warpsPerBlock;
     /* Number of sub-warps per block*/
@@ -512,15 +475,6 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
             switch (i)
             {
-            case csr_adaptive:
-
-                number_of_blocks = csr_adaptive_rowblocks(M, K[k], nz, h_irp, &rowBlocks, &threadsPerBlock);
-
-                /* Number of blocks per grid */
-                blocksPerGrid = (number_of_blocks - 1) * K[k];
-                
-                break;
-
             case csr_adaptive_personalizzato:
 
                 ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K[k]);
@@ -642,29 +596,6 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
                 switch (i)
                 {
-                case csr_adaptive:
-                
-					/* Device allocation for d_rowBlocks */
-		            memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
-
-		            /* Copy rowBlocks from the Host to the Device*/
-		            memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
-		            
-		            // START TIMER
-                	checkCudaErrors(cudaEventRecord(start, stream));
-                
-                    /* CSR Adaptive */
-                    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K[k], nz, d_as, d_ja, d_irp, d_X_t, d_y, d_rowBlocks);
-		                
-		            // STOP TIMER
-		            checkCudaErrors(cudaEventRecord(stop, stream));
-		            checkCudaErrors(cudaEventSynchronize(stop));
-		            checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
-                    
-					
-		            free_memory_Cuda(d_rowBlocks);
-		            
-                    break;
                 
                 case csr_adaptive_personalizzato:
                 
@@ -783,10 +714,6 @@ void samplings_GPU_CSR_flush_cache(int M, int N, int nz, double *h_as, int *h_ja
 
             switch (i)
             {
-            case csr_adaptive:
-				fprintf(f_samplings, "csr_adaptive,%d, %lf,%.20lf\n", K[k], Gflops, variance);
-				free(rowBlocks);
-                break;
                 
             case csr_adaptive_personalizzato:
 				fprintf(f_samplings, "csr_adaptive_personalizzato,%d, %lf,%.20lf\n", K[k], Gflops, variance);
@@ -1112,6 +1039,299 @@ void samplings_GPU_ELLPACK(int M, int N, int nz, int *nz_per_row, double **value
 
     /* Start the memory cleaning process on Host */
     printf("Freeing host memory ...\n");
+
+    if (h_values != NULL)
+        free(h_values);
+    if (h_col_indices != NULL)
+        free(h_col_indices);
+    if (h_sum_nz != NULL)
+        free(h_sum_nz);
+
+    /**
+     * Closing the file
+     */
+    if (f_samplings != stdin)
+        fclose(f_samplings);
+}
+
+
+/**
+*
+* samplings_GPU_ELLPACK_flush_cache - Function that computs for a fixed number of samplings, the mean and the variance of the GFOLPS as the algorithm and K vary.
+* The overall results are written in a proper .csv file. The cache is properly flushed
+*
+* @param M: Number of rows
+* @param N: Number of columns
+* @param nz: Number of nz
+* @param nz_per_row: Array containing the number of non-zeroes per row
+* @param values: 2D array of coefficients
+* @param col_indices: 2D array of column indexes
+*/
+ 
+
+void samplings_GPU_ELLPACK_flush_cache(int M, int N, int nz, int *nz_per_row, double **values, int **col_indices)
+{
+    // Error code to check return values for CUDA calls
+    cudaError_t err = cudaSuccess;
+    cudaEvent_t start, stop;
+    cudaStream_t stream = NULL; 
+
+    int K[] = {1, 3, 4, 8, 12, 16, 32, 64};
+
+    int modes[] = {ellpack, ellpack_sub_warp}; 
+
+    FILE *f_samplings;
+    /**
+     * Name of the file to be created and written to
+     */
+    char fn[100]; 
+
+    // host variables
+    double *h_y = NULL;
+    double *h_X = NULL;
+    double *h_values = NULL;
+    int *h_col_indices = NULL;
+    int *h_sum_nz = NULL;
+
+    // Device variables
+    double *d_X = NULL;
+    double *d_y = NULL;
+    double *d_values = NULL;
+    int *d_col_indices = NULL;
+
+    int *d_nz_per_row = NULL;
+    int *d_sum_nz = NULL;
+
+
+    // SAMPLINGS variables
+    double M2 = 0.0;
+    double variance = 0.0;
+    double Gflops = 0.0;
+    double curr_Gflops = 0.0;
+
+
+    /* Number of threads per block */
+    int threadsPerBlock = MAX_BLOCK_DIM;
+    /** Number of blocks per grid*/
+    int blocksPerGrid;
+    /*Total number of elements to be computed*/
+    int numElements;
+
+    int sub_warp_size = 2;
+
+    /*Number of warps per block*/
+    int warpsPerBlock = threadsPerBlock / sub_warp_size;
+
+    float expireTimeMsec = 0.0; 
+
+    /* irregular 2D to 1D conversions*/
+    if (values != NULL)
+        h_values = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, values);
+        
+    h_col_indices = convert_2D_to_1D_per_ragged_matrix(M, nz, nz_per_row, col_indices); 
+
+    h_sum_nz = compute_sum_nz(M, nz_per_row);
+
+     /* Opening the output file*/
+    printf("Opening the output file\n"); 
+
+    char *token;
+    token = strtok(filename, "/");
+    token = strtok(NULL, "/"); 
+
+    sprintf(fn, "plots/samplings_ELLPACK_GPU_%s.csv", token);
+    f_samplings = fopen(fn, "w+");
+    fprintf(f_samplings, "Algorithm,K,GFLOPS,GFLOPS_variability\n"); 
+
+    for (int k = 0; k < sizeof(K) / sizeof(int); k++)
+    {
+        /**
+         * Creating the X matrix with its number of columns specified by K[k]
+         */
+        create_dense_matrix_1D(N, K[k], &h_X); 
+
+        /* Y array host memory allocation */
+        memory_allocation(double, M *K[k], h_y);
+
+        /* Number of elements of the product matrix Y */
+        numElements = M * K[k]; 
+
+        for (int i = 0; i < sizeof(modes) / sizeof(int); i++)
+        {
+            switch (i)
+            {
+            case ellpack:
+                /* Number of blocks per grid */
+                blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+                break;
+            case ellpack_sub_warp:
+                /* Number of blocks per grid */
+                blocksPerGrid = (numElements + warpsPerBlock - 1) / warpsPerBlock;
+                break;
+            default:
+                printf("The mode is invalid\n");
+                exit(1);
+                break;
+            } 
+
+            /**
+             * Resetting the average stats
+             */
+
+            curr_Gflops = 0.0;
+            M2 = 0.0;
+            variance = 0.0;
+            Gflops = 0.0; 
+
+            for (int curr_samp = 0; curr_samp < SAMPLING_SIZE; curr_samp++)
+            {   
+
+				if (cudaDeviceReset() != cudaSuccess) {
+					printf("cudaDeviceReset failed!\n");
+					exit(1);
+				} 
+
+                printf("Allocating device variables for CPU ELLPACK product ...\n");
+
+                /* Y array host memory allocation */
+                memory_allocation_Cuda(double, M *K[k], d_y);
+                /* Device allocation for dense matrix X */
+                memory_allocation_Cuda(double, N *K[k], d_X);
+
+                /* Copy of the contents of the dense vector h_X from the Host to the Devicee */
+                memcpy_to_dev(h_X, d_X, double, N *K[k]); 
+
+                if (values != NULL)
+                    /* Device allocation for the 2D array ontaining non-zero elements */
+                    memory_allocation_Cuda(double, nz, d_values);
+                /* Device allocation for the 2D array of column indexes */
+                memory_allocation_Cuda(int, nz, d_col_indices);
+                /* Device allocation for the array of non-zeroes per row*/
+                memory_allocation_Cuda(int, M, d_nz_per_row);
+                /* Device allocation for the array of the sums of non-zeroes*/
+                memory_allocation_Cuda(int, M, d_sum_nz); 
+
+                printf("Copy input data from the host memory to the CUDA device\n");
+
+                if (values != NULL)
+                    /* Copy of the contents of the h_values from the Host to the Device */
+                    memcpy_to_dev(h_values, d_values, double, nz); 
+
+                /* Copy of the contents of h_col_indices from the Host to the Device */
+                memcpy_to_dev(h_col_indices, d_col_indices, int, nz);
+                /* Copy of the contents of nz_per_row from the Host to the Device */
+                memcpy_to_dev(nz_per_row, d_nz_per_row, int, M); 
+
+                /* Copy of the contents of h_sum_nz from the Host to the Device */
+                memcpy_to_dev(h_sum_nz, d_sum_nz, int, M); 
+
+                checkCudaErrors(cudaEventCreate(&start));
+                checkCudaErrors(cudaEventCreate(&stop));
+
+                printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K[k], blocksPerGrid, threadsPerBlock);
+
+                switch (i)
+                {
+                case ellpack: 
+
+                    // START TIMER
+                    checkCudaErrors(cudaEventRecord(start, stream)); 
+
+                    ELLPACK_kernel<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y); 
+
+                    // STOP TIMER
+                    checkCudaErrors(cudaEventRecord(stop, stream));
+                    checkCudaErrors(cudaEventSynchronize(stop));
+                    checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+                    break;
+                case ellpack_sub_warp:
+
+                    // START TIMER
+                    checkCudaErrors(cudaEventRecord(start, stream));
+                    ELLPACK_Sub_warp<<<blocksPerGrid, threadsPerBlock>>>(M, K[k], d_nz_per_row, d_sum_nz, d_values, d_col_indices, d_X, d_y, sub_warp_size); 
+
+                    // STOP TIMER
+                    checkCudaErrors(cudaEventRecord(stop, stream));
+                    checkCudaErrors(cudaEventSynchronize(stop));
+                    checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+                    break; 
+
+                default:
+                    printf("The mode is invalid\n");
+                    exit(1);
+                    break;
+                }
+
+ 
+
+                err = cudaGetLastError();
+                if (err != cudaSuccess)
+                {
+                    fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
+                            cudaGetErrorString(err));
+                    exit(EXIT_FAILURE);
+                }
+
+ 
+
+                /**
+                 * Welford's one-pass algorithm is an efficient method for computing mean and variance in a single pass over a sequence of values.
+                 * It achieves this by updating the mean and variance incrementally as new values are encountered.
+                 */
+
+ 
+
+                curr_Gflops = compute_GFLOPS(K[k], nz, expireTimeMsec * 1e6);
+                Gflops = calculate_mean(curr_Gflops, Gflops, curr_samp + 1);
+                M2 = calculate_M2(curr_Gflops, Gflops, M2, curr_samp + 1);
+            }
+            /*After processing all values, the variance can be calculated as M2 / (n - 1).*/
+            variance = M2 / (SAMPLING_SIZE - 1);
+
+            printf("GLOPS MEAN (GLOPS VARIANCE %lf) FOR PARALLEL PRODUCT GPU with K = %d is: %lf\n", variance, K[k], Gflops); 
+
+            /**
+             * Writing in the file the GLOPS mean and variance
+             */
+
+            switch (i)
+            {
+            case ellpack:
+                fprintf(f_samplings, "ellpack,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
+            case ellpack_sub_warp:
+                fprintf(f_samplings, "ellpack_sub_warp,%d, %lf,%.20lf\n", K[k], Gflops, variance);
+                break;
+            default:
+                printf("The mode is invalid\n");
+                exit(1);
+                break;
+            } 
+
+            fflush(f_samplings); 
+
+            /* Start the memory cleaning process on Device */
+            printf("Freeing Device memory ...\n"); 
+
+            free_memory_Cuda(d_X);
+            free_memory_Cuda(d_y); 
+
+            if (values != NULL)
+                free_memory_Cuda(d_values);
+                
+            free_memory_Cuda(d_col_indices);
+            free_memory_Cuda(d_nz_per_row);
+            free_memory_Cuda(d_sum_nz);
+        } 
+
+        if (h_X != NULL)
+            free(h_X);
+        if (h_y != NULL)
+            free(h_y);
+    }
+
+    /* Start the memory cleaning process on Host */
+    printf("Freeing host memory ...\n"); 
 
     if (h_values != NULL)
         free(h_values);

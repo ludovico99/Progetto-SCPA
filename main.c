@@ -297,7 +297,8 @@ int main(int argc, char *argv[])
 #elif ELLPACK
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
-    samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
+    //samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
+    samplings_GPU_ELLPACK_flush_cache(M, N, nz, nz_per_row, values, col_indices);
 
 #endif
     free(y_parallel_cuda);

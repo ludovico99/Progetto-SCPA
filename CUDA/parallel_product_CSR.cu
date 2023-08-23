@@ -428,9 +428,7 @@ __global__ void CSR_Vector(const int M, const int N, const int K, const int nz, 
         if (lane < 1)
             vals[threadIdx.x] += vals[threadIdx.x + 1];
 
-        /**
-         * Only the first thread writes the result
-         */
+        /* Only the first thread writes the result */
 
         if (lane == 0)
         {
@@ -438,200 +436,6 @@ __global__ void CSR_Vector(const int M, const int N, const int K, const int nz, 
         }
     }
 }
-
-
-
-/*------------------------------------------------------ CSR Vector RIDUZIONE OTTIMIZZATA --------------------------------------------------------------------------------------*/
-
-/**
- * CSR_Vector - CSR vector implementation between sparse matrix A and dense matrix X
- *
- * Each thread in a warp computes a partial result for an element in y.
- * Throught shared memory some threads in a warp perform parallel reduction.
- * Only the first thread in the warp writes the result in the resulting matrix
- *
- *@param M: Number of rows of the matrix A
- *@param N: Number of columns of the matrix A, Number of rows of the matrix X
- *@param K:  Number of columns of the matrix X
- *@param nz: Number of nz
- *@param d_as: Vector containing the non-zero elements of the sparse array
- *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
- *@param d_irp: Vector containing the column index of the first nonzero of rows
- *@param d_X: Dense matrix
- *@param d_y: Resulting matrix
- */
-
-__global__ void CSR_Vector_optimazed_reduction(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y)
-{
-    const int num_elements = M * K;
-
-    /* Thread identifier */
-    const long tid = blockDim.x * blockIdx.x + threadIdx.x; // global thread index
-
-    const int lane = threadIdx.x & (WARP_SIZE - 1); // thread index within the warp
-
-    /* Global Warp Index */
-    const long warp_id = tid / WARP_SIZE;
-
-    /* Row of the item that the warp should compute */
-    const int i = warp_id / K;
-
-    /* Column of the item that the warp should compute */
-    const int z = warp_id % K;
-
-    /*Starting */
-    const long col = z * N;
-
-    if (warp_id < num_elements)
-    {
-
-        int start = d_irp[i];
-        int end = d_irp[i + 1];
-
-        double sum = 0.0;
-        for (int j = start + lane; j < end; j += WARP_SIZE)
-        {
-
-            if (d_as != NULL)
-                sum += d_as[j] * d_X[col + d_ja[j]];
-            else
-                sum += 1.0 * d_X[col + d_ja[j]];
-        }
-
-        for (int offset = 16; offset > 0; offset /= 2)
-            sum += __shfl_down_sync(0xffffffff, sum, offset, 32);        
-
-        /**
-         * Only the first thread writes the result
-         */
-
-        if (lane == 0)
-        {
-            d_y[i * K + z] = sum;
-        }
-    }
-}
-
-
-/*------------------------------------------------------ CSR ADAPTIVE --------------------------------------------------------------------------------------*/
-
-/**
- * CSR_Adaptive - CSR Adaptive implementation between sparse matrix A and dense matrix X
- *
- * CSR-Adapive is an algorithm that dynamically decides whether to use CSR-Stream or CSR-Vector
- *
- *@param M: Number of rows of the matrix A
- *@param N: Number of columns of the matrix A, Number of rows of the matrix X
- *@param K:  Number of columns of the matrix X
- *@param nz: Number of nz
- *@param d_as: Vector containing the non-zero elements of the sparse array
- *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
- *@param d_irp: Vector containing the column index of the first nonzero of rows
- *@param X: Dense matrix
- *@param d_y: Resulting matrix
- *@param d_rowBlocks: Array containing the starting row index per block
- *
- */
-__global__ void CSR_Adaptive(const int M, const int N, const int K, const int nz, double *d_as, int *d_ja, int *d_irp, double *d_X, double *d_y, int *d_rowBlocks)
-{
-
-    extern __shared__ volatile double LDS[];
-
-    /*my_block identifies in d_rowBlocks the rows of its competence*/
-    const int my_block = blockIdx.x / K;
-
-    /*Starting row index for the current block*/
-    const int startRow = d_rowBlocks[my_block];
-
-    /*Index of the starting row of the next row for the current block*/
-    const int nextStartRow = d_rowBlocks[my_block + 1];
-    
-    /* Number of rows in the current block*/
-    const int num_rows = nextStartRow - startRow;
-
-    const int tid_within_block = threadIdx.x;
-
-    /*Columns assigned to the current block*/
-    const int z = blockIdx.x % K;
-
-    if (nextStartRow <= M)
-    {
-
-        // If the block consists of more than one row then run CSR Stream
-        if (num_rows > 1)
-        {
-            int nnz = 0;
-
-            nnz = d_irp[nextStartRow] - d_irp[startRow];
-
-            int first_col = d_irp[startRow];
-
-            // Each thread writes to shared memory
-            if (tid_within_block < nnz)
-            {
-                if (d_as != NULL)
-                    LDS[tid_within_block] = d_as[first_col + tid_within_block] * d_X[z * N + d_ja[first_col + tid_within_block]];
-                else
-                    LDS[tid_within_block] = 1.0 * d_X[z * N + d_ja[first_col + tid_within_block]];
-            }
-            __syncthreads();
-
-            // # numRows threads perform Scalar Reduction out of LDS to compute final output
-            for (int i = startRow + tid_within_block; i < nextStartRow; i += blockDim.x)
-            {
-
-                int start = d_irp[i];
-                int end = d_irp[i + 1];
-
-                double temp = 0.0;
-                for (int j = (start - first_col); j < (end - first_col); j++)
-                {
-                    temp += LDS[j];
-                }
-
-                d_y[i * K + z] = temp;
-            }
-        }
-        // If the block consists of only one row then run CSR Vector
-        else
-        {
-            int rowStart = d_irp[startRow];
-
-            int rowEnd = d_irp[nextStartRow];
-
-            double sum = 0.0;
-
-            // Use all threads in a warp to accumulate multiplied elements
-            for (int j = rowStart + tid_within_block; j < rowEnd; j += blockDim.x)
-            {
-                if (d_as != NULL)
-                    sum += d_as[j] * d_X[z * N + d_ja[j]];
-                else
-                    sum += 1.0 * d_X[z * N + d_ja[j]];
-            }
-
-            LDS[tid_within_block] = sum;
-            __syncthreads();
-
-            // Reduce partial sums
-
-            for (int stride = blockDim.x >> 1; stride > 0; stride >>= 1)
-            {
-                if (tid_within_block < stride)
-                    LDS[tid_within_block] += LDS[tid_within_block + stride];
-
-                __syncthreads();
-            }
-
-            // Write result
-            if (tid_within_block == 0)
-                d_y[startRow * K + z] = LDS[tid_within_block];
-        }
-    }
-}
-
-
-
 
 /**
  * CSR_Adaptive_personalizzato - CSR Adaptive (variant) implementation between sparse matrix A and dense matrix X
@@ -742,7 +546,6 @@ __global__ void CSR_Adaptive_personalizzato(const int M, const int N, const int 
             {
                 d_y[elem.row * K + elem.col] = vals[threadIdx.x];
             }
-
 
         }
     }
@@ -899,80 +702,6 @@ struct core_adaptive_personalizzato *csr_adaptive_personalizzato_number_of_block
     return ret;
 }
 
-
-
-/**
- * csr_adaptive_rowblocks: This CPU code calculates the number of rows of a CSR matrix that can fit in the shared memory
- *
- *
- * @param M: Number of rows
- * @param nz: Number of non-zeroes
- * @param irp: Vector containing the column index of the first nonzero of rows
- * @param rowBlocks: Array containing the starting row index per block
- * @param threadsPerBlock: pointer to an integer representing the computed threads per block
- *
- * @returns the number of blocks computed
- *
- * */
-
-int csr_adaptive_rowblocks(int M, int K, int nz, int *irp, int **rowBlocks, int *threadsPerBlock)
-{
-
-    int sum_nz = 0, last_i = 0, ctr = 1, local_size;
-    all_zeroes_memory_allocation(int, M + 1, *rowBlocks);
-
-    (*rowBlocks)[0] = 0;
-
-    
-
-    // int sh_memory_per_block = 49152;                     // Total amount shared memory per block in bytes
-    // int max_size = sh_memory_per_block / sizeof(double); // Total amount of double in the shared memory
-
-    /*Computing the average number of non-zeroes per row*/
-    local_size = pow(2, floor(log2((nz + M - 1) / M)));
-
-    if (local_size < WARP_SIZE)
-        local_size = WARP_SIZE;
-    if (local_size > MAX_BLOCK_DIM)
-        local_size = MAX_BLOCK_DIM; // Surely MAX_BLOCK_DIM * 8 bytes is less than sh_memory_per_block bytes
-    
-
-    for (int i = 1; i <= M; i++)
-    {
-        sum_nz += irp[i] - irp[i - 1]; // Count non-zeroes in the i-th row
-
-        if (sum_nz == local_size)
-        { // The row fills up to LOCAL SIZE
-            last_i = i;
-            (*rowBlocks)[ctr++] = i;
-            sum_nz = 0;
-        }
-        else if (sum_nz > local_size)
-        {
-
-            if (i - last_i > 1)
-            {
-                (*rowBlocks)[ctr++] = i - 1; // this extra row will not fit
-                --i;
-            }
-            else if (i - last_i == 1)
-            {
-                // This row is too large. It has too much zeroes
-                (*rowBlocks)[ctr++] = i;
-            }
-
-            last_i = i;
-            sum_nz = 0;
-        }
-        else if (i == M)
-            (*rowBlocks)[ctr++] = M; // Inserting last start row if it has not been previuosly inserted
-    }
-    
-    *threadsPerBlock = local_size;
-
-    return ctr;
-}
-
 /*------------------------------------------------------ KERNEL SETUP --------------------------------------------------------------------------------------*/
 
 /**
@@ -1025,18 +754,13 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     float expireTimeMsec = 0.0;
 
-#if defined(CSR_ADAPTIVE)
-    int *rowBlocks = NULL;
-    int *d_rowBlocks = NULL;
-#endif
-
-#if defined(CSR_ADAPTIVE_PERSONALIZZATO)
+#ifdef CSR_ADAPTIVE_PERSONALIZZATO
     long *d_metadata = NULL;
     struct item* d_items_scalar=NULL;
     struct item* d_items_vector=NULL;
 #endif
 
-#if defined(CSR_ADAPTIVE) || defined(CSR_VECTOR) || defined(CSR_VECTOR_BY_ROW)
+#if defined(CSR_VECTOR) || defined(CSR_VECTOR_BY_ROW)
     h_X = transpose_from_2D(N, K, X);
 #else
     /* 2D to 1D dense matrix X conversion*/
@@ -1082,20 +806,7 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of threads per block */
     int threadsPerBlock = MAX_BLOCK_DIM;
 
-#ifdef CSR_ADAPTIVE
-
-    int number_of_blocks = csr_adaptive_rowblocks(M, K, nz, h_irp, &rowBlocks, &threadsPerBlock);
-
-    /* Device allocation for d_rowBlocks */
-    memory_allocation_Cuda(int, number_of_blocks, d_rowBlocks);
-
-    /* Copy rowBlocks from the Host to the Device*/
-    memcpy_to_dev(rowBlocks, d_rowBlocks, int, number_of_blocks);
-
-    /* Number of blocks per grid */
-    int blocksPerGrid = (number_of_blocks - 1) * K;
-
-#elif CSR_ADAPTIVE_PERSONALIZZATO
+#ifdef CSR_ADAPTIVE_PERSONALIZZATO
 
     struct core_adaptive_personalizzato *ret = csr_adaptive_personalizzato_number_of_blocks(M, nz_per_row, threadsPerBlock, K);
 
@@ -1135,13 +846,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     /* Number of elements of the product matrix Y */
     int numElements = M * K;
 
-    /**
-    * sub_warp_size is the power of 2 closest to the mean (rounded down) of non-zeros per row
-    */
-
-    // int sub_warp_size = pow(2,floor(log2((nz + M - 1)/ M)));
-    // if (sub_warp_size > WARP_SIZE) sub_warp_size = WARP_SIZE;
-
     int sub_warp_size = 2;
     int warpsPerBlock = threadsPerBlock / sub_warp_size;
 
@@ -1160,8 +864,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("CUDA kernel for K = %d launch with %d blocks of %d threads\n", K, blocksPerGrid,
            threadsPerBlock);
-           
-//	checkCudaErrors(cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte));
 
     checkCudaErrors(cudaEventCreate(&start));
     checkCudaErrors(cudaEventCreate(&stop));
@@ -1169,20 +871,14 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
     // START TIMER
     checkCudaErrors(cudaEventRecord(start, stream));
 
-#ifdef CSR_ADAPTIVE
-
-    /* CSR Adaptive */
-    CSR_Adaptive<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_rowBlocks);
-
-#elif CSR_ADAPTIVE_PERSONALIZZATO
+#if CSR_ADAPTIVE_PERSONALIZZATO
 
     CSR_Adaptive_personalizzato<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y, d_metadata, d_items_scalar, d_items_vector);
 
 #elif CSR_VECTOR
 
     /* CSR Vector */
-    //CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
-    CSR_Vector_optimazed_reduction<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
+    CSR_Vector<<<blocksPerGrid, threadsPerBlock>>>(M, N, K, nz, d_as, d_ja, d_irp, d_X, d_y);
 
 #elif CSR_VECTOR_BY_ROW
 
@@ -1203,18 +899,18 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
 #endif
 
-    err = cudaGetLastError();
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n",
-                cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-
     // STOP TIMER
     checkCudaErrors(cudaEventRecord(stop, stream));
     checkCudaErrors(cudaEventSynchronize(stop));
     checkCudaErrors(cudaEventElapsedTime(&expireTimeMsec, start, stop));
+
+    err = cudaGetLastError();
+    
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "Failed to launch CSR kernel (error code %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec * 1e-3);
 
@@ -1227,27 +923,31 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     /* Start the memory cleaning process on Device */
     printf("Freeing Device memory ...\n");
+    
     if (h_as != NULL)
         free_memory_Cuda(d_as);
+        
     free_memory_Cuda(d_ja);
     free_memory_Cuda(d_irp);
     free_memory_Cuda(d_X);
     free_memory_Cuda(d_y);
-
-#if defined(CSR_ADAPTIVE)
-    free_memory_Cuda(d_rowBlocks);
+    
+#ifdef CSR_ADAPTIVE_PERSONALIZZATO
+	free_memory_Cuda(d_metadata);
+	free_memory_Cuda(d_items_scalar);
+	free_memory_Cuda(d_items_vector);
 #endif
 
     /* Start the memory cleaning process on Host */
 
     printf("Freeing host memory ...\n");
 
-    // print_y_GPU(M, K, h_y);
-
     free(h_X);
-
-#if defined(CSR_ADAPTIVE)
-    free(rowBlocks);
+    
+#ifdef CSR_ADAPTIVE_PERSONALIZZATO
+	free(ret->metadata);
+	free(ret->items_scalar);
+	free(ret->items_vector);
 #endif
 
     printf("Completed parallel product CSR ...\n");
