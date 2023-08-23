@@ -291,14 +291,14 @@ int main(int argc, char *argv[])
 #ifdef CSR
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
-    samplings_GPU_CSR(M, N, nz, as, ja, irp, nz_per_row);
-    //samplings_GPU_CSR_flush_cache(M, N, nz, as, ja, irp, nz_per_row);
+    //samplings_GPU_CSR(M, N, nz, as, ja, irp, nz_per_row);
+    samplings_GPU_CSR_flush_cache(M, N, nz, as, ja, irp, nz_per_row);
 
 #elif ELLPACK
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
-    samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
-    //samplings_GPU_ELLPACK_flush_cache(M, N, nz, nz_per_row, values, col_indices);
+    //samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
+    samplings_GPU_ELLPACK_flush_cache(M, N, nz, nz_per_row, values, col_indices);
 
 #endif
     free(y_parallel_cuda);
@@ -315,7 +315,9 @@ int main(int argc, char *argv[])
     /**
      * With CORRECTNESS defined, we wants to verify that the serial product is equal to the parallel one within a tolerance range.
      */
-    int K = 64;
+    
+    int K = atoi(argv[2]);
+
     create_dense_matrix(N, K, &X);
 
 #ifdef ELLPACK

@@ -128,61 +128,61 @@ openmp-ellpack-parallel-samplings:
 #------------------------------------------------------------------------- RUN ON A SPECIFIED MATRIX ---------------------------------------------------------------------------------------------------
 
 adder-dcop-32:
-	$(binDir)/app Matrici/adder_dcop_32/adder_dcop_32.mtx 
+	$(binDir)/app Matrici/adder_dcop_32/adder_dcop_32.mtx 64
 
 PR02R:
-	$(binDir)/app Matrici/PR02R/PR02R.mtx 
+	$(binDir)/app Matrici/PR02R/PR02R.mtx 64
 
 dc1:
-	$(binDir)/app Matrici/dc1/dc1.mtx 
+	$(binDir)/app Matrici/dc1/dc1.mtx 64
 
 F1:
-	$(binDir)/app Matrici/F1/F1.mtx 
+	$(binDir)/app Matrici/F1/F1.mtx 64
 
 raefsky2:
-	$(binDir)/app Matrici/raefsky2/raefsky2.mtx 
+	$(binDir)/app Matrici/raefsky2/raefsky2.mtx 64
 
 mhd4800a:
-	$(binDir)/app Matrici/mhd4800a/mhd4800a.mtx 
+	$(binDir)/app Matrici/mhd4800a/mhd4800a.mtx 64
 
 bcsstk17:
-	$(binDir)/app Matrici/bcsstk17/bcsstk17.mtx 
+	$(binDir)/app Matrici/bcsstk17/bcsstk17.mtx 64
 
 amazon0302:
-	$(binDir)/app Matrici/amazon0302/amazon0302.mtx 
+	$(binDir)/app Matrici/amazon0302/amazon0302.mtx 64
 
 Cube_Coup_dt0:
-	$(binDir)/app Matrici/Cube_Coup_dt0/Cube_Coup_dt0.mtx 
+	$(binDir)/app Matrici/Cube_Coup_dt0/Cube_Coup_dt0.mtx 64
 
 ML_Laplace:
-	$(binDir)/app Matrici/ML_Laplace/ML_Laplace.mtx 
+	$(binDir)/app Matrici/ML_Laplace/ML_Laplace.mtx 64
 
 thermal2:
-	$(binDir)/app Matrici/thermal2/thermal2.mtx
+	$(binDir)/app Matrici/thermal2/thermal2.mtx 64
 
 af:
-	$(binDir)/app Matrici/af23560/af23560.mtx
+	$(binDir)/app Matrici/af23560/af23560.mtx 64
 
 cavity10:
-	$(binDir)/app Matrici/cavity10/cavity10.mtx
+	$(binDir)/app Matrici/cavity10/cavity10.mtx 64
 
 mcfe:
-	$(binDir)/app Matrici/mcfe/mcfe.mtx
+	$(binDir)/app Matrici/mcfe/mcfe.mtx 64
 
 lung2:
-	$(binDir)/app Matrici/lung2/lung2.mtx
+	$(binDir)/app Matrici/lung2/lung2.mtx 64
 
 mhda416:
-	$(binDir)/app Matrici/mhda416/mhda416.mtx
+	$(binDir)/app Matrici/mhda416/mhda416.mtx 64
 
 olm1000:
-	$(binDir)/app Matrici/olm1000/olm1000.mtx
+	$(binDir)/app Matrici/olm1000/olm1000.mtx 64
 
 rdist2:
-	$(binDir)/app Matrici/rdist2/rdist2.mtx
+	$(binDir)/app Matrici/rdist2/rdist2.mtx 64
 
 west2021:
-	$(binDir)/app Matrici/west2021/west2021.mtx
+	$(binDir)/app Matrici/west2021/west2021.mtx 64
 
 #------------------------------------------------------------------------- DEBUG SCRIPTS ---------------------------------------------------------------------------------------------------------
 
@@ -238,4 +238,4 @@ copy-main:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/main.c $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
 
 copy-file:
-	scp -i $(SSH_KEY)  -r $(DIR_SRC)/cavity10 $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/Matrici
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/samplings.sh $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/

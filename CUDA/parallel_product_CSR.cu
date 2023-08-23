@@ -754,6 +754,37 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     float expireTimeMsec = 0.0;
 
+    FILE *f_samplings;
+    /**
+     * Name of the file to be created and written to
+     */
+    char fn[100];
+
+    /**
+     * Opening the output file
+     */
+    printf("Opening the output file\n");
+
+    char *token;
+    token = strtok(filename, "/");
+    token = strtok(NULL, "/");
+
+    sprintf(fn, "plots/samplings_cflush_CSR_GPU_%s.csv", token);
+
+    f_samplings = fopen(fn, "r");
+    if (f_samplings == NULL){
+        printf("Error opening the output file");
+
+        f_samplings = fopen(fn, "w");
+        fprintf(f_samplings, "Algorithm,K,GFLOPS\n");
+    }
+    else {
+
+        fclose(f_samplings);
+        f_samplings = fopen(fn, "a");
+    }
+    
+
 #ifdef CSR_ADAPTIVE_PERSONALIZZATO
     long *d_metadata = NULL;
     struct item* d_items_scalar=NULL;
@@ -919,7 +950,33 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec * 1e-3);
 
-    printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
+    double Gflops = compute_GFLOPS(K, nz, expireTimeMsec * 1e6);
+
+    printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", Gflops);
+
+    #if CSR_ADAPTIVE_PERSONALIZZATO
+
+        fprintf(f_samplings, "csr_adaptive_personalizzato,%d,%lf\n", K, Gflops);
+
+    #elif CSR_VECTOR
+
+        fprintf(f_samplings, "csr_vector,%d,%lf\n", K, Gflops);
+
+    #elif CSR_VECTOR_BY_ROW
+
+        fprintf(f_samplings, "csr_vector_by_row,%d,%lf\n", K, Gflops);
+
+    #elif CSR_VECTOR_SUB_WARP
+
+        fprintf(f_samplings, "csr_vector_sub_warp,%d,%lf\n", K, Gflops);
+
+    #else
+
+        fprintf(f_samplings, "csr_scalar,%d,%lf\n", K, Gflops);
+
+    #endif
+
+    
 
     printf("Copy output data from the CUDA device to the host memory\n");
 
