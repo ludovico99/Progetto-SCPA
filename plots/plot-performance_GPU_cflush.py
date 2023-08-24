@@ -108,39 +108,19 @@ def print_all_results_CSR():
 
     ax.plot(K, mean_scalar, marker='o', markersize=2,
             label="GLOPS for CSR SCALAR", linewidth=0.5, color='indigo')
-    ci = stats.t.interval(0.995, n-1, loc=mean_scalar,
-                          scale=std_scalar/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='indigo', alpha=0.1)
 
     ax.plot(K, mean_vector, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR", linewidth=0.5, color='red')
-    ci = stats.t.interval(0.995, n-1, loc=mean_vector,
-                          scale=std_vector/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='red', alpha=0.1)
 
     ax.plot(K, mean_vector_by_row, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR BY ROW", linewidth=0.5, color='orange')
-    ci = stats.t.interval(0.995, n-1, loc=mean_vector_by_row,
-                          scale=std_vector_by_row/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='orange', alpha=0.1)
 
     ax.plot(K, mean_vector_sw, marker='o', markersize=2,
             label="GLOPS for CSR VECTOR SUB-WARP", linewidth=0.5, color='blue')
-    ci = stats.t.interval(0.995, n-1, loc=mean_vector_sw,
-                          scale=std_vector_sw/np.sqrt(n))
 
-    ax.fill_between(K, ci[0], ci[1],
-                    color='blue', alpha=0.1)
 
     ax.plot(K, mean_adaptive_p, marker='o', markersize=2,
             label="GLOPS for CSR ADAPTIVE PERSONALIZZATO", linewidth=0.5, color='cyan')
-    ci = stats.t.interval(0.995, n-1, loc=mean_adaptive_p,
-                          scale=std_adaptive_p/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='cyan', alpha=0.1)
 
     ax.legend(loc='upper left', shadow=True, fontsize=10)
 
