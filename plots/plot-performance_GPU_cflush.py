@@ -22,8 +22,8 @@ stats_csr_adaptive_p = [[], []]
 samplings_ellpack = []
 samplings_ellpack_sub_warp = []
 
-stats_ellpack = []
-stats_ellpack_sub_warp = []
+stats_ellpack = [[], []]
+stats_ellpack_sub_warp = [[], []]
 
  
 def compute_mean_var():
@@ -156,17 +156,9 @@ def print_all_results_ELLPACK():
 
     ax.plot(K, mean, marker='o', markersize=2,
             label="GLOPS for ELLPACK", linewidth=0.5, color='indigo')
-    ci = stats.t.interval(0.995, n-1, loc=mean, scale=std/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='indigo', alpha=0.1,
-                    label="Confidence band of 95 of ELLPACK")
 
     ax.plot(K, mean_sw, marker='o', markersize=2,
             label="GLOPS for ELLPACK SUB-WARP", linewidth=0.5, color='red')
-    ci = stats.t.interval(0.995, n-1, loc=mean_sw, scale=std_sw/np.sqrt(n))
-    ax.fill_between(K, ci[0], ci[1],
-                    color='red', alpha=0.1,
-                    label="Confidence band of 95 of ELLPACK with sub-warps")
 
     ax.legend(loc='upper right', shadow=True, fontsize=10)
 
@@ -184,8 +176,9 @@ def print_all_results_ELLPACK():
 
 # Leggo le misure delle prestazioni per il parallelo
 if len(sys.argv) >= 2:
-	#df_parallel = pandas.read_csv("samplings_cflush_ELLPACK_GPU_{}.csv".format(sys.argv[1]))
-	df_parallel = pandas.read_csv("samplings_cflush_CSR_GPU_{}.csv".format(sys.argv[1]))
+	df_parallel = pandas.read_csv("samplings_cflush_ELLPACK_GPU_{}.csv".format(sys.argv[1]))
+	
+    #df_parallel = pandas.read_csv("samplings_cflush_CSR_GPU_{}.csv".format(sys.argv[1]))
 else:
 	print("usage: prog matrix\n")
 	exit(1)
@@ -219,5 +212,5 @@ for row in df_parallel.itertuples(index=False):
 print("I dati sono stati letti con successo.")
 
 compute_mean_var()
-print_all_results_CSR()
-#print_all_results_ELLPACK()
+#print_all_results_CSR()
+print_all_results_ELLPACK()
