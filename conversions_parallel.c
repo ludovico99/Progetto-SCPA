@@ -333,7 +333,7 @@ int coo_to_ellpack_parallel(int M, int N, int nz, int *I, int *J, double *val, d
             /**
              * WARNING: In questa conversione parallela gli array values e col_indices in diverse iterazioni rimangono invariati
              * poichè il thread i-esimo va a modificare la componente (i, offset), entrambe variabili private per i. Di conseguenza,
-             * il risultato del prodotto matrice-vettore, nonostante non sia commutativo in aritmetica floating point, rimane invariato
+             * il risultato del prodotto matrice-vettore, nonostante non sia associativo in aritmetica floating point, rimane invariato
              * in diverse esecuzioni.
              */
             if (I[j] == i)

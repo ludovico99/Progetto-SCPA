@@ -97,11 +97,7 @@ int compute_chunk_size(int value, int nthread)
         chunk_size = value / nthread;
     else
         chunk_size = value / nthread + 1;
-    /*
-     * 16 is equal to the number of integers in a cache line.
-     * It is also a multiple of 8, which is the number of doubles in a cache line.
-     */
-    if (chunk_size > 16) chunk_size = chunk_size - chunk_size % (16); // It is the integer closest to the chunk size multiple of 16.
+
     return chunk_size;
 }
 

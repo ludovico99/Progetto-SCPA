@@ -23,11 +23,10 @@
  *@param K:  Number of columns of the matrix X
  *@param nz_per_row: Array containing the number of non-zeroes per row
  *@param sum_nz: Array whose i-th entry contains the sum of non-zeroes up to the i-th row
- *@param d_values: 2D array of coefficients
- *@param d_col_indices: 2D array of column indexes
+ *@param d_values: 1D array of coefficients
+ *@param d_col_indices: 1D array of column indexes
  *@param d_X: Dense matrix
  *@param d_y: Resulting matrix
- *@param numElements: Number of elements of the product matrix Y
  *
  */
 
@@ -63,6 +62,8 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *s
     }
 }
 
+
+
 /**
  * ELLPACK_Sub_warp - Product implementation between sparse matrix A and dense matrix X.
  * 
@@ -72,14 +73,13 @@ __global__ void ELLPACK_kernel(const int M, const int K, int *nz_per_row, int *s
  *
  *@param M: Number of rows of the matrix A
  *@param K:  Number of columns of the matrix X
- *@param nz: Number of nz
- *@param d_as: Vector containing the non-zero elements of the sparse array
- *@param d_ja: Vector containing the column indexes of the nonzero elements of the sparse array
- *@param d_irp: Vector containing the column index of the first nonzero of rows
- *@param X: Dense matrix
+ *@param nz_per_row: Array containing the number of non-zeroes per row
+ *@param sum_nz: Array whose i-th entry contains the sum of non-zeroes up to the i-th row
+ *@param d_values: 1D array of coefficients
+ *@param d_col_indices: 1D array of column indexes
+ *@param d_X: Dense matrix
  *@param d_y: Resulting matrix
- *@param sub_warp_size: Number of threads (at most 32) that cooperates to compute an element.  
- *
+ *@param sub_warp_size: Number of threads (at most 32) that cooperates to compute an element.
  */
 __global__ void ELLPACK_Sub_warp(const int M, const int K, int *nz_per_row, int *sum_nz, double *d_values, int *d_col_indices, double *d_X, double *d_y, const int sub_warp_size)
 {
