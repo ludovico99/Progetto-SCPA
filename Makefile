@@ -239,3 +239,7 @@ copy-main:
 
 copy-file:
 	scp -i $(SSH_KEY)  -r $(DIR_SRC)/samplings.sh $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
+
+copy-sampling-scripts:
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/samplings_csr.sh $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/
+	scp -i $(SSH_KEY)  -r $(DIR_SRC)/samplings_ellpack.sh $(USERNAME_DEST)@160.80.85.52:$(DIR_DEST)/Progetto-SCPA/

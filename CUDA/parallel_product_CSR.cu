@@ -975,7 +975,6 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
         fprintf(f_samplings, "csr_scalar,%d,%lf\n", K, Gflops);
 
     #endif
-
     
 
     printf("Copy output data from the CUDA device to the host memory\n");
@@ -1011,6 +1010,8 @@ double *CSR_GPU(int M, int N, int K, int nz, double *h_as, int *h_ja, int *h_irp
 	free(ret->items_scalar);
 	free(ret->items_vector);
 #endif
+
+    fclose(f_samplings);
 
     printf("Completed parallel product CSR ...\n");
 

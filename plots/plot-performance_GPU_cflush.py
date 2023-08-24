@@ -19,8 +19,11 @@ stats_csr_vector_by_row = [[], []]
 stats_csr_vector_sw = [[], []]
 stats_csr_adaptive_p = [[], []]
 
-samplings_ellpack = [[], []]
-samplings_ellpack_sub_warp = [[], []]
+samplings_ellpack = []
+samplings_ellpack_sub_warp = []
+
+stats_ellpack = []
+stats_ellpack_sub_warp = []
 
  
 def compute_mean_var():
@@ -58,7 +61,20 @@ def compute_mean_var():
         stats_csr_adaptive_p[0].append(media_gruppo)
         stats_csr_adaptive_p[1].append(varianza_gruppo)
 
- 
+    for i in range(0, len(samplings_ellpack), n):
+
+        gruppo = samplings_ellpack[i:i+n]
+        media_gruppo = sum(gruppo) / len(gruppo)
+        varianza_gruppo = sum((x - media_gruppo) ** 2 for x in gruppo) / len(gruppo)
+        stats_ellpack[0].append(media_gruppo)
+        stats_ellpack[1].append(varianza_gruppo)
+
+        gruppo = samplings_ellpack_sub_warp[i:i+n]
+        media_gruppo = sum(gruppo) / len(gruppo)
+        varianza_gruppo = sum((x - media_gruppo) ** 2 for x in gruppo) / len(gruppo)
+        stats_ellpack_sub_warp[0].append(media_gruppo)
+        stats_ellpack_sub_warp[1].append(varianza_gruppo)
+
 
 
 def print_all_results_CSR():
@@ -141,6 +157,50 @@ def print_all_results_CSR():
     plt.savefig("Immagini/CSR_GPU_{}.png".format(sys.argv[1]))
    
 
+def print_all_results_ELLPACK():
+
+    mean = stats_ellpack[0]
+    variance = stats_ellpack[1]
+    std = np.sqrt(variance)
+
+    mean_sw = stats_ellpack_sub_warp[0]
+    variance_sw = stats_ellpack_sub_warp[1]
+    std_sw = np.sqrt(variance_sw)
+
+    plt.style.use('seaborn-v0_8')
+    plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='x')
+    plt.grid(color='grey', linestyle='-', linewidth=0.8, alpha=0.2, axis='y')
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(16, 9)
+
+    ax.plot(K, mean, marker='o', markersize=2,
+            label="GLOPS for ELLPACK", linewidth=0.5, color='indigo')
+    ci = stats.t.interval(0.995, n-1, loc=mean, scale=std/np.sqrt(n))
+    ax.fill_between(K, ci[0], ci[1],
+                    color='indigo', alpha=0.1,
+                    label="Confidence band of 95 of ELLPACK")
+
+    ax.plot(K, mean_sw, marker='o', markersize=2,
+            label="GLOPS for ELLPACK SUB-WARP", linewidth=0.5, color='red')
+    ci = stats.t.interval(0.995, n-1, loc=mean_sw, scale=std_sw/np.sqrt(n))
+    ax.fill_between(K, ci[0], ci[1],
+                    color='red', alpha=0.1,
+                    label="Confidence band of 95 of ELLPACK with sub-warps")
+
+    ax.legend(loc='upper right', shadow=True, fontsize=10)
+
+    plt.title("Matrice {}: Plot dei GFLOPS al variare di K e dell'algoritmo utilizzato per il formato ELLPACK".format(sys.argv[1]),
+              fontsize=18, fontname='DejaVu Sans', weight='bold', style='italic')
+
+    plt.xlabel("Number of columns (K)")
+
+    plt.xticks(K)
+
+    plt.ylabel("GLOPS")
+    # Salva il grafico come immagine
+    plt.savefig("Immagini/ELLPACK_GPU_{}.png".format(sys.argv[1]))
+
 
 # Leggo le misure delle prestazioni per il parallelo
 if len(sys.argv) >= 2:
@@ -156,7 +216,6 @@ for row in df_parallel.itertuples(index=False):
     try:
         
         if (row[0] == "csr_scalar"):
-
             samplings_csr_scalar.append(row[2])
         elif (row[0] == "csr_vector"):
             samplings_csr_vector.append(row[2])
@@ -180,6 +239,5 @@ for row in df_parallel.itertuples(index=False):
 print("I dati sono stati letti con successo.")
 
 compute_mean_var()
-
 print_all_results_CSR()
 #print_all_results_ELLPACK()

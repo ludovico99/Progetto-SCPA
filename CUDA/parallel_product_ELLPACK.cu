@@ -200,6 +200,36 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     float expireTimeMsec = 0.0;
 
+     FILE *f_samplings;
+    /**
+     * Name of the file to be created and written to
+     */
+    char fn[100];
+
+    /**
+     * Opening the output file
+     */
+    printf("Opening the output file\n");
+
+    char *token;
+    token = strtok(filename, "/");
+    token = strtok(NULL, "/");
+
+    sprintf(fn, "plots/samplings_cflush_ELLPACK_GPU_%s.csv", token);
+
+    f_samplings = fopen(fn, "r");
+    if (f_samplings == NULL){
+        printf("Error opening the output file");
+
+        f_samplings = fopen(fn, "w");
+        fprintf(f_samplings, "Algorithm,K,GFLOPS\n");
+    }
+    else {
+
+        fclose(f_samplings);
+        f_samplings = fopen(fn, "a");
+    }
+
     /* 2D to 1D dense matrix X conversion*/
     h_X = convert_2D_to_1D(N, K, X);
 
@@ -298,7 +328,19 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
 
     printf("ELAPSED TIME FOR PARALLEL PRODUCT GPU: %lf ns = %lf ms = %lf seconds\n", expireTimeMsec * 1e6, expireTimeMsec, expireTimeMsec * 1e-3);
 
-    printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", compute_GFLOPS(K, nz, expireTimeMsec * 1e6));
+    double Gflops = compute_GFLOPS(K, nz, expireTimeMsec * 1e6);
+
+    printf("GFLOPS FOR PARALLEL PRODUCT GPU: %lf\n", Gflops);
+
+    #ifdef ELLPACK_SUB_WARP
+
+        fprintf(f_samplings, "ellpack_sub_warp,%d,%lf\n", K, Gflops);
+
+    #else
+
+        fprintf(f_samplings, "ellpack,%d,%lf\n", K, Gflops);
+
+    #endif
 
     printf("Copy output data from the CUDA device to the host memory\n");
 
@@ -324,6 +366,8 @@ double *ELLPACK_GPU(int M, int N, int K, int nz, int *nz_per_row, double **value
         free(h_col_indices);
     if (h_sum_nz != NULL)
         free(h_sum_nz);
+
+    fclose(f_samplings);
 
     printf("Completed parallel product ...\n");
 
