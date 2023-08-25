@@ -76,7 +76,6 @@ double **parallel_product_CSR(int M, int N, int K, int nz, double *as, int *ja, 
         {
 
             double partial_sum = 0.0;
-
             for (int j = start; j < end; j++)
             {
                 if (as != NULL)
