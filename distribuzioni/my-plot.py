@@ -68,7 +68,7 @@ lines = data_file.readlines()
 # Costruisco l'array di dati per l'istogramma
 valori = []
 num_righe_con_tale_valore = []
-parity=0;
+parity=0
 for line in lines:
 	if(parity==0):
 		# Sono nella prima riga con il valore

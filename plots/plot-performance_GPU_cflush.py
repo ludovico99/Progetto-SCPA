@@ -176,9 +176,9 @@ def print_all_results_ELLPACK():
 
 # Leggo le misure delle prestazioni per il parallelo
 if len(sys.argv) >= 2:
-	df_parallel = pandas.read_csv("samplings_cflush_ELLPACK_GPU_{}.csv".format(sys.argv[1]))
+	#df_parallel = pandas.read_csv("samplings_cflush_ELLPACK_GPU_{}.csv".format(sys.argv[1]))
 	
-    #df_parallel = pandas.read_csv("samplings_cflush_CSR_GPU_{}.csv".format(sys.argv[1]))
+    df_parallel = pandas.read_csv("samplings_cflush_CSR_GPU_{}.csv".format(sys.argv[1]))
 else:
 	print("usage: prog matrix\n")
 	exit(1)
@@ -212,5 +212,5 @@ for row in df_parallel.itertuples(index=False):
 print("I dati sono stati letti con successo.")
 
 compute_mean_var()
-#print_all_results_CSR()
-print_all_results_ELLPACK()
+print_all_results_CSR()
+#print_all_results_ELLPACK()

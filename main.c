@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 #include "lib/mmio.h"
 #include "include/header.h"
@@ -93,6 +94,14 @@ int main(int argc, char *argv[])
 
     int *nz_per_row = NULL;
 
+    // FILE *f_distributions;
+    // FILE *f_pie;
+    // /**
+    //  * Name of the file to be created and written to
+    //  */
+    // char fn_d[100];
+    // char fn_p[100];
+
 #ifdef ELLPACK
     // Declaring variables for ELLPACK matrix representation
     double **values = NULL;
@@ -118,7 +127,6 @@ int main(int argc, char *argv[])
      */
     double **X;
     MM_typecode matcode;
-
 
     // nthread is the number of processors available to the device.
     nthread = omp_get_num_procs();
@@ -271,6 +279,53 @@ int main(int argc, char *argv[])
     /* This conversion version of CSR optimizes the previous version*/
     nz_per_row = coo_to_CSR_parallel_optimization(M, N, nz, I, J, val, &as, &ja, &irp, nthread);
 
+    // printf("Opening the output file for non-zero per row distribution \n");
+
+    // char *token;
+    // token = strtok(filename, "/");
+    // token = strtok(NULL, "/");
+
+    // sprintf(fn_d, "distribuzioni/input_files/%s.txt", token);
+    // sprintf(fn_p, "distribuzioni/pie/%s.txt", token);
+
+    // f_distributions = fopen(fn_d, "w+");
+    // f_pie = fopen(fn_p, "w+");
+    // if (f_distributions == NULL || f_pie == NULL)
+    // {
+
+    //     printf("Error opening the output file");
+    // }
+
+    // else
+    // {
+
+    //     for (int i = 0; i < M; i++)
+    //     {
+    //         fprintf(f_distributions, "%d\n", nz_per_row[i]);
+    //     }
+
+    //     int *occurrences = calloc(sizeof(int), nz);
+
+    //     for (int i = 0; i < M; i++)
+    //     {
+    //         occurrences[nz_per_row[i]]++;
+    //     }
+
+    //     for (int i = 0; i < nz; i++)
+    //     {
+    //         if (occurrences[i] != 0)
+    //         {
+    //             fprintf(f_pie, "%d\n", i);
+    //             fprintf(f_pie, "%d\n", occurrences[i]);
+    //         }
+    //     }
+
+    //     free(occurrences);
+    // }
+
+    // fclose(f_distributions);
+    // fclose(f_pie);
+
 #endif // CHECK_CONVERSION
 #endif
 
@@ -292,13 +347,13 @@ int main(int argc, char *argv[])
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the CSR kernel */
     samplings_GPU_CSR(M, N, nz, as, ja, irp, nz_per_row);
-    //samplings_GPU_CSR_dev_res(M, N, nz, as, ja, irp, nz_per_row);
+    // samplings_GPU_CSR_dev_res(M, N, nz, as, ja, irp, nz_per_row);
 
 #elif ELLPACK
 
     /* The parallel product is executed on the GPU. It first allocates memory on the GPU and then starts the ELLPACK kernel */
     samplings_GPU_ELLPACK(M, N, nz, nz_per_row, values, col_indices);
-    //samplings_GPU_ELLPACK_dev_res(M, N, nz, nz_per_row, values, col_indices);
+    // samplings_GPU_ELLPACK_dev_res(M, N, nz, nz_per_row, values, col_indices);
 
 #endif
     free(y_parallel_cuda);
@@ -315,7 +370,7 @@ int main(int argc, char *argv[])
     /**
      * With CORRECTNESS defined, we wants to verify that the serial product is equal to the parallel one within a tolerance range.
      */
-    
+
     int K = atoi(argv[2]);
 
     create_dense_matrix(N, K, &X);
